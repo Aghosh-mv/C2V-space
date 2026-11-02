@@ -9,7 +9,6 @@ import {
   BookOpen,
   Store,
   Sparkles,
-  Wand2,
   PlayCircle,
   Palette,
   UploadCloud,
@@ -21,7 +20,6 @@ import { CodeEditor } from '@/components/studio/code-editor';
 import { Player } from '@/components/studio/player';
 import { LearnView } from '@/components/studio/learn-view';
 import { Marketplace, PublishDialog } from '@/components/studio/marketplace';
-import { AiDialog } from '@/components/studio/ai-dialog';
 import { parseSceneLang } from '@/lib/scenelang/parser';
 import { parseStyleKit } from '@/lib/scenelang/stylekit';
 import { addImportToCode, setThemeInCode } from '@/lib/scenelang/themes';
@@ -57,7 +55,6 @@ export default function Page() {
   const [editorTab, setEditorTab] = useState<'scene' | 'style'>('scene');
   const [exporting, setExporting] = useState(false);
   const [exportLabel, setExportLabel] = useState('');
-  const [aiOpen, setAiOpen] = useState(false);
   const [publishKind, setPublishKind] = useState<'style' | 'template' | 'video'>('style');
   const [publishOpen, setPublishOpen] = useState(false);
   const [styleVersion, setStyleVersion] = useState(0);
@@ -66,6 +63,8 @@ export default function Page() {
 
   useEffect(() => {
     const id = setTimeout(() => {
+      // re-register installed marketplace styles so `import` / theme lines resolve after a reload
+      for (const s of loadInstalledStyles()) parseStyleKit(s.code);
       const s = window.localStorage.getItem(SCENE_KEY);
       const st = window.localStorage.getItem(STYLE_KEY);
       if (s) {
@@ -215,20 +214,12 @@ export default function Page() {
           <div className="ml-auto flex items-center gap-2">
             <span
               className={cn(
-                'hidden rounded-full px-3 py-1 font-mono text-[11.5px] md:block',
+                'rounded-full px-3 py-1 font-mono text-[11.5px]',
                 errors.length === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
               )}
             >
               {compilerChip}
             </span>
-            <Button
-              onClick={() => setAiOpen(true)}
-              className="gap-1.5 rounded-full bg-violet-600 text-white shadow-sm hover:bg-violet-700"
-              size="sm"
-            >
-              <Wand2 className="h-4 w-4" />
-              <span className="hidden sm:inline">AI write</span>
-            </Button>
           </div>
         </div>
       </header>
@@ -359,7 +350,6 @@ export default function Page() {
       </footer>
 
       {/* dialogs */}
-      <AiDialog open={aiOpen} onOpenChange={setAiOpen} currentCode={sceneCode} onCode={loadIntoScene} />
       <PublishDialog
         key={publishKind}
         open={publishOpen}

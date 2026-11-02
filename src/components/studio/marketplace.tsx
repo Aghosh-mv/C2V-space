@@ -167,7 +167,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
 
       {/* detail dialog */}
       <Dialog open={detail !== null} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="max-w-2xl rounded-3xl">
+        <DialogContent aria-describedby={undefined} className="max-w-2xl rounded-3xl">
           {detail && (
             <>
               <DialogHeader>
@@ -262,7 +262,7 @@ export function PublishDialog({ open, onOpenChange, kind, code, defaultTitle, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl">
+      <DialogContent aria-describedby={undefined} className="max-w-md rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-lg">
             Publish {kind === 'style' ? 'style' : kind === 'template' ? 'video template' : 'video'} to the Marketplace
