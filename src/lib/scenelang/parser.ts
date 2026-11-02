@@ -36,9 +36,9 @@ const ENTER_ANIMS = new Set<EnterAnim>([
 const TEXT_ANIMS = new Set<TextAnim>(['kinetic', 'typewriter', 'pop', 'fade', 'fade-up']);
 const CHART_ANIMS = new Set<ChartAnim>(['grow', 'spin', 'pop', 'fade']);
 
-const BG_COLORS = ['#0f0c29', '#302b63'];
-const MAX_SCENE_MS = 30_000;
-const MAX_TOTAL_MS = 120_000;
+const BG_COLORS = ['#fafafc', '#edeaf7'];
+const MAX_SCENE_MS = 60_000;
+const MAX_TOTAL_MS = 300_000;
 
 function normalizeAnim(raw: string): string {
   return raw.trim().replace(/^enter:/, '').toLowerCase();
@@ -97,7 +97,7 @@ export function parseSceneLang(source: string): ParseResult {
   let width = 1280;
   let height = 720;
   let fps = 30;
-  let theme = 'neon';
+  let theme = 'aurora';
   const scenes: Scene[] = [];
   let current: Scene | null = null;
 
@@ -245,7 +245,7 @@ export function parseSceneLang(source: string): ParseResult {
   if (totalMs > MAX_TOTAL_MS) {
     errors.push({
       line: lines.length,
-      message: `total video is ${(totalMs / 1000).toFixed(0)}s — keep it under ${MAX_TOTAL_MS / 1000}s`,
+      message: `total video is ${(totalMs / 1000).toFixed(0)}s — keep it under ${MAX_TOTAL_MS / 1000 / 60} minutes`,
     });
   }
 
