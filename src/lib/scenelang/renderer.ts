@@ -332,9 +332,9 @@ function drawTitle(ctx: Ctx, spec: VideoSpec, T: ThemeTokens, el: { text: string
   return;
 }
 
-function drawSubtitle(ctx: Ctx, spec: VideoSpec, T: ThemeTokens, el: { text: string; anim: string }, elT: number) {
+function drawSubtitle(ctx: Ctx, spec: VideoSpec, T: ThemeTokens, el: { text: string; anim: string }, elT: number, hasPie = false) {
   const { width: W, height: H } = spec;
-  const y = H * 0.56;
+  const y = hasPie ? H * 0.88 : H * 0.56;
   const size = H * 0.05;
   ctx.font = `500 ${size}px ${T.font}`;
   ctx.textAlign = 'center';
@@ -463,6 +463,8 @@ function drawPie(ctx: Ctx, spec: VideoSpec, T: ThemeTokens, el: { data: { label:
   const p = easeInOutQuint(clamp01(elT / 1100));
 
   let start = -Math.PI / 2;
+  const ringR = r * 0.79;
+  const ringW = r * 0.42;
   data.forEach((d, i) => {
     const frac = Math.max(0, d.value) / total;
     const sweep = frac * Math.PI * 2 * p;
@@ -477,24 +479,16 @@ function drawPie(ctx: Ctx, spec: VideoSpec, T: ThemeTokens, el: { data: { label:
       ctx.shadowBlur = 14;
       ctx.shadowOffsetY = 5;
     }
-    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
     ctx.globalAlpha = 0.94;
+    ctx.lineWidth = ringW;
+    ctx.lineCap = 'butt';
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, start, start + sweep);
-    ctx.closePath();
-    ctx.fill();
+    ctx.arc(cx, cy, ringR, start, start + sweep);
+    ctx.stroke();
     ctx.restore();
     start += sweep;
   });
-
-  // elegant center hole
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.58, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 
   // legend
   ctx.textAlign = 'left';
@@ -650,7 +644,7 @@ function drawSceneElements(
         drawTitle(ctx, spec, T, el, elT);
         break;
       case 'subtitle':
-        drawSubtitle(ctx, spec, T, el, elT);
+        drawSubtitle(ctx, spec, T, el, elT, kinds.has('pie'));
         break;
       case 'text':
         drawBodyText(ctx, spec, T, el, elT, kinds.has('subtitle'));

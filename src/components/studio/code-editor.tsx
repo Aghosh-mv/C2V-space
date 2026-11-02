@@ -9,16 +9,19 @@ import { cn } from '@/lib/utils';
 
 const FONT_CLASS = 'font-mono text-[12.5px] leading-[20px]';
 
-const TOKEN_RE =
-  /(\/\/.*)|("(?:[^"\\]|\\.)*")|(#[0-9a-fA-F]{3,8})|(\{[^}]*\})|(\b(?:video|theme|scene|outro|bg|title|subtitle|text|bars|pie|image|shape)\b)|(\b(?:kinetic|typewriter|pop|fade-up|fade|slide-left|slide-right|zoom-in|pan|pulse|glow|grow|spin|gradient|solid|grid)\b)|(\b\d+(?:\.\d+)?\b)|(\(|\)|->)/g;
+const SCENE_TOKEN_RE =
+  /(\/\/.*)|("(?:[^"\\]|\\.)*")|(#[0-9a-fA-F]{3,8})|(\{[^}]*\})|(\b(?:video|theme|scene|outro|bg|title|subtitle|text|bars|pie|image|shape|import)\b)|(\b(?:kinetic|typewriter|pop|fade-up|fade|slide-left|slide-right|zoom-in|pan|pulse|glow|grow|spin|gradient|solid|grid)\b)|(\b\d+(?:\.\d+)?\b)|(\(|\)|->)/g;
 
-function highlightLine(line: string, keyPrefix: string) {
+const STYLE_TOKEN_RE =
+  /(\/\/.*)|(#[0-9a-fA-F]{3,8})|(rgba?\([^)]*\))|(\b(?:style|base|bg|ink|dim|accents|font|tracking|glow|vignette|orbs|motion|texture)\b)|(\b(?:on|off|sans|serif|mono|smooth|swift|grain|none)\b)|(\b\d+(?:\.\d+)?\b)/g;
+
+function highlightLine(line: string, keyPrefix: string, re: RegExp) {
   const nodes: React.ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
-  TOKEN_RE.lastIndex = 0;
+  re.lastIndex = 0;
   let i = 0;
-  while ((m = TOKEN_RE.exec(line)) !== null) {
+  while ((m = re.exec(line)) !== null) {
     if (m.index > last) nodes.push(line.slice(last, m.index));
     const [full, comment, str, hex, data, kw, anim, num, punct] = m;
     let cls = '';
@@ -60,18 +63,21 @@ interface Props {
   onChange: (code: string) => void;
   errors: ParseError[];
   readOnly?: boolean;
+  language?: 'scene' | 'style';
 }
 
-export function CodeEditor({ code, onChange, errors, readOnly }: Props) {
+export function CodeEditor({ code, onChange, errors, readOnly, language = 'scene' }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
 
+  const tokenRe = language === 'style' ? STYLE_TOKEN_RE : SCENE_TOKEN_RE;
+
   const lines = useMemo(() => code.split('\n'), [code]);
   const highlighted = useMemo(
-    () => lines.flatMap((line, i) => highlightLine(line, `l${i}`)),
-    [lines],
+    () => lines.flatMap((line, i) => highlightLine(line, `l${i}`, tokenRe)),
+    [lines, tokenRe],
   );
   const errorLines = useMemo(() => new Set(errors.map((e) => e.line)), [errors]);
 
@@ -101,19 +107,21 @@ export function CodeEditor({ code, onChange, errors, readOnly }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* snippet chips */}
-      <div className="flex flex-wrap gap-1.5 border-b bg-zinc-50/80 px-3 py-2">
-        {SNIPPETS.map((s) => (
-          <button
-            key={s.label}
-            type="button"
-            disabled={readOnly}
-            onClick={() => insertSnippet(s.code)}
-            className="rounded-full border bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:opacity-40"
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {language === 'scene' && (
+        <div className="flex flex-wrap gap-1.5 border-b bg-zinc-50/80 px-3 py-2">
+          {SNIPPETS.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              disabled={readOnly}
+              onClick={() => insertSnippet(s.code)}
+              className="rounded-full border bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:opacity-40"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* editor body */}
       <div className="relative flex min-h-0 flex-1">

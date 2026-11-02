@@ -160,7 +160,7 @@ scene ring (3.5s) fade
     points: [
       'Slideshow shows every scene fully settled — perfect for presenting.',
       'Auto-advance flips scenes using each scene\'s duration.',
-      'Export WebM for an instant video file, MP4 for universal playback.',
+      'Export MP4 to COMPILE your code into a real video file — frame by frame, no recording.',
       'Export PDF or PPTX to get one beautiful slide per scene.',
     ],
     code: `video 1280x720 30fps
@@ -172,5 +172,93 @@ scene agenda (4s) fade-up
 
 scene thanks (3s) zoom-in
   title "Questions?" kinetic`,
+  },
+];
+
+/** StyleKit lessons — the second language. */
+export const STYLEKIT_LESSONS: Lesson[] = [
+  {
+    id: 'sk-basics',
+    title: '1 · What is a style?',
+    minutes: 2,
+    summary:
+      'StyleKit is the second language. A style is a look — colors, ink, type, motion feel. The Studio ships with aurora and swiss; StyleKit lets you invent your own and sell them.',
+    points: [
+      'A style file starts with:  style my-style-name',
+      'base aurora — inherit the smooth premium engine, then override what you like.',
+      'Use it in a video with:  theme my-style-name',
+      'Styles are tiny — 6 to 10 short lines.',
+    ],
+    code: `style cloud-nine
+base aurora
+bg #fbfdff -> #e8f0fa
+ink #1d2b3a
+accents #1d2b3a, #5b8def, #f2a65a, #6ecb63
+font sans
+tracking 1`,
+  },
+  {
+    id: 'sk-colors',
+    title: '2 · Colors, ink and feel',
+    minutes: 3,
+    summary:
+      'Four words paint everything: bg paints the stage, ink is the main text color, accents feed charts and highlights, dim softens secondary text.',
+    points: [
+      'bg #faf6f0 -> #f3e7d8 — two colors, top to bottom.',
+      'ink #3d2f23 — titles and strong text.',
+      'accents #b5654a, #8a9a5b — comma-separated; bars & pies cycle through them.',
+      'dim rgba(61,47,35,0.6) — secondary text color.',
+    ],
+    code: `style terracotta
+base aurora
+bg #faf6f0 -> #f3e7d8
+ink #3d2f23
+dim rgba(61, 47, 35, 0.6)
+accents #b5654a, #8a9a5b, #3d2f23, #d9b08c
+font serif`,
+  },
+  {
+    id: 'sk-feel',
+    title: '3 · Type, glow and atmosphere',
+    minutes: 3,
+    summary:
+      'The feel words control the motion mood. Keep glow off for clean light looks; turn it on for rich dark styles where text and charts softly radiate.',
+    points: [
+      'font sans, serif or mono — the whole typography system.',
+      'tracking 1.5 — letter-spacing in pixels, for that airy premium feel.',
+      'glow off | on — soft light radiation on charts and shapes.',
+      'vignette 0.25 — darkens corners subtly. orbs 9 — floating bokeh dust.',
+    ],
+    code: `style noir-gold
+base aurora
+bg #101012 -> #1d1c1a
+ink #f6f1e7
+accents #d4af37, #f6f1e7, #9c8244
+font serif
+tracking 2
+glow on
+vignette 0.3
+orbs 8`,
+  },
+  {
+    id: 'sk-market',
+    title: '4 · Publish, sell, import',
+    minutes: 2,
+    summary:
+      'A style is a product. Publish it to the Marketplace with a price, and anyone who buys it can import it into their own videos with one word.',
+    points: [
+      'Open the Style tab in the Studio and press "Publish style".',
+      'Buyers press Get / Buy, then Import — the Studio adds the import line for them.',
+      'In any video:  import midnight-lux  then  theme midnight-lux',
+      'Video templates and videos can be listed too — sell the whole thing, not just the look.',
+    ],
+    code: `// In a SceneLang video, borrowed styles are one word away:
+import midnight-lux
+
+video 1280x720 30fps
+theme midnight-lux
+
+scene opener (4s) fade
+  title "Bought. Imported. Mine." kinetic`,
   },
 ];

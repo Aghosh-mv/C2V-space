@@ -15,7 +15,7 @@ import {
   Play,
   Presentation,
   Repeat,
-  RotationCcw,
+  RotateCcw,
   Clapperboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,10 +26,10 @@ import { formatDuration } from '@/lib/scenelang/parser';
 import { renderFrame, sceneSettleMs } from '@/lib/scenelang/renderer';
 import {
   downloadBlob,
+  compileVideoToMp4,
   exportPdf,
   exportPptx,
   pickRecorderMime,
-  transcodeWebmToMp4,
   type Ctx,
 } from '@/lib/scenelang/export';
 import type { VideoSpec } from '@/lib/scenelang/types';
@@ -42,10 +42,11 @@ type ExportKind = 'webm' | 'mp4' | 'pdf' | 'pptx';
 interface Props {
   spec: VideoSpec;
   exporting: boolean;
+  exportLabel: string;
   onExportingChange: (busy: boolean, label: string) => void;
 }
 
-export function Player({ spec, exporting, onExportingChange }: Props) {
+export function Player({ spec, exporting, exportLabel, onExportingChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
@@ -67,6 +68,7 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
   const exportingRef = useRef(false);
   exportingRef.current = exporting;
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const cancelRef = useRef(false);
   const slideIdxRef = useRef(0);
   slideIdxRef.current = slideIdx;
 
@@ -237,24 +239,35 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
       try {
         onExportingChange(true, 'Preparing…');
 
-        if (kind === 'webm' || kind === 'mp4') {
-          onExportingChange(true, 'Recording video (real-time)…');
+        if (kind === 'webm') {
+          onExportingChange(true, 'Capturing preview (real-time)…');
           const webm = await recordWebM();
           if (!webm) return;
-          if (kind === 'webm') {
-            downloadBlob(webm, 'scenelang-video.webm');
-            toast.success('Video saved as WebM');
-          } else {
-            onExportingChange(true, 'Converting to MP4 — first run downloads a helper (~30 MB)…');
-            try {
-              const mp4 = await transcodeWebmToMp4(webm, (p) =>
-                onExportingChange(true, `Converting to MP4… ${Math.round(p * 100)}%`),
-              );
-              downloadBlob(mp4, 'scenelang-video.mp4');
-              toast.success('Video saved as MP4');
-            } catch {
-              downloadBlob(webm, 'scenelang-video.webm');
-              toast.error('MP4 converter unavailable — saved WebM instead.');
+          downloadBlob(webm, 'scenelang-capture.webm');
+          toast.success('Preview captured as WebM');
+        } else if (kind === 'mp4') {
+          onExportingChange(true, 'Compiling your video from code…');
+          cancelRef.current = false;
+          try {
+            const mp4 = await compileVideoToMp4(
+              specRef.current,
+              (p) => onExportingChange(true, `Compiling video… ${Math.round(p * 100)}%`),
+              () => cancelRef.current,
+            );
+            downloadBlob(mp4, 'scenelang-video.mp4');
+            toast.success('Video compiled to MP4 — made entirely from your code');
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg === 'cancelled') {
+              toast.info('Compile cancelled');
+            } else {
+              toast.error('Fast compiler unavailable here — falling back to real-time capture.');
+              onExportingChange(true, 'Capturing preview (real-time)…');
+              const webm = await recordWebM();
+              if (webm) {
+                downloadBlob(webm, 'scenelang-capture.webm');
+                toast.success('Saved as WebM (browser cannot compile MP4)');
+              }
             }
           }
         } else {
@@ -277,6 +290,7 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
         toast.error('Export failed — try again.');
       } finally {
         recorderRef.current = null;
+        cancelRef.current = false;
         onExportingChange(false, '');
       }
     },
@@ -288,6 +302,21 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* export status / cancel */}
+      {exporting && (
+        <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-600" />
+          <span className="flex-1 truncate text-[13px] font-medium text-violet-800">{exportLabel}</span>
+          <button
+            type="button"
+            onClick={() => (cancelRef.current = true)}
+            className="rounded-full border border-violet-300 bg-white px-3 py-1 text-[12px] font-medium text-violet-700 transition-colors hover:bg-violet-100"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* mode toggle */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex rounded-lg border bg-zinc-100 p-0.5">
@@ -325,18 +354,18 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Save your video</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => runExport('webm')}>
-              <Film className="mr-2 h-4 w-4 text-violet-600" />
-              <div>
-                <p className="text-[13px] font-medium">WebM video</p>
-                <p className="text-[11px] text-zinc-500">instant, recorded in-browser</p>
-              </div>
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => runExport('mp4')}>
               <Clapperboard className="mr-2 h-4 w-4 text-violet-600" />
               <div>
-                <p className="text-[13px] font-medium">MP4 video</p>
-                <p className="text-[11px] text-zinc-500">plays everywhere, slower</p>
+                <p className="text-[13px] font-medium">MP4 video — compile</p>
+                <p className="text-[11px] text-zinc-500">frame-by-frame from your code, no recording</p>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => runExport('webm')}>
+              <Film className="mr-2 h-4 w-4 text-violet-600" />
+              <div>
+                <p className="text-[13px] font-medium">WebM quick capture</p>
+                <p className="text-[11px] text-zinc-500">real-time fallback capture</p>
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -375,7 +404,7 @@ export function Player({ spec, exporting, onExportingChange }: Props) {
       {mode === 'anim' ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="icon" variant="outline" onClick={() => { seek(0); }} disabled={exporting} aria-label="Restart">
-            <RotationCcw className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" />
           </Button>
           <Button size="icon" onClick={togglePlay} disabled={exporting || scenes.length === 0} className="bg-violet-600 text-white hover:bg-violet-700" aria-label={playing ? 'Pause' : 'Play'}>
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}

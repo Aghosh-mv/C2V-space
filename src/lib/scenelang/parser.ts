@@ -37,8 +37,8 @@ const TEXT_ANIMS = new Set<TextAnim>(['kinetic', 'typewriter', 'pop', 'fade', 'f
 const CHART_ANIMS = new Set<ChartAnim>(['grow', 'spin', 'pop', 'fade']);
 
 const BG_COLORS = ['#fafafc', '#edeaf7'];
-const MAX_SCENE_MS = 60_000;
-const MAX_TOTAL_MS = 300_000;
+const MAX_SCENE_MS = 3_600_000; // one hour per scene
+const MAX_TOTAL_MS = 86_400_000; // a whole day — your code decides the length
 
 function normalizeAnim(raw: string): string {
   return raw.trim().replace(/^enter:/, '').toLowerCase();
@@ -89,8 +89,9 @@ function pickAnim(
 /**
  * Parse SceneLang source code into a VideoSpec.
  * Never throws — returns errors with line numbers instead.
+ * `knownStyles` = style names installed from the Marketplace (for theme validation).
  */
-export function parseSceneLang(source: string): ParseResult {
+export function parseSceneLang(source: string, knownStyles: string[] = []): ParseResult {
   const errors: ParseError[] = [];
   const lines = source.split('\n');
 
@@ -98,6 +99,7 @@ export function parseSceneLang(source: string): ParseResult {
   let height = 720;
   let fps = 30;
   let theme = 'aurora';
+  const imports = new Set<string>();
   const scenes: Scene[] = [];
   let current: Scene | null = null;
 
@@ -118,6 +120,13 @@ export function parseSceneLang(source: string): ParseResult {
     const themeMatch = text.match(THEME_RE);
     if (themeMatch) {
       theme = themeMatch[1].toLowerCase();
+      return;
+    }
+
+    // import a style from the marketplace
+    const importMatch = text.match(/^import\s+([\w-]+)/);
+    if (importMatch) {
+      imports.add(importMatch[1].toLowerCase());
       return;
     }
 
@@ -245,8 +254,19 @@ export function parseSceneLang(source: string): ParseResult {
   if (totalMs > MAX_TOTAL_MS) {
     errors.push({
       line: lines.length,
-      message: `total video is ${(totalMs / 1000).toFixed(0)}s — keep it under ${MAX_TOTAL_MS / 1000 / 60} minutes`,
+      message: `total video is ${(totalMs / 1000).toFixed(0)}s — keep it under 24 hours`,
     });
+  }
+
+  // theme must be built-in, imported, or installed from the marketplace
+  if (scenes.length > 0) {
+    const known = new Set(['aurora', 'swiss', ...imports, ...knownStyles.map((s) => s.toLowerCase())]);
+    if (!known.has(theme)) {
+      errors.push({
+        line: 0,
+        message: `style "${theme}" isn't installed — open the Marketplace to get it, or add "import ${theme}" above the theme line`,
+      });
+    }
   }
 
   return {

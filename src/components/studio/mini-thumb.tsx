@@ -16,6 +16,8 @@ export function MiniThumb({ code, className }: { code: string; className?: strin
     const { spec } = parseSceneLang(code);
     const ctx = canvas.getContext('2d');
     if (!ctx || !spec) return;
+    canvas.width = spec.width;
+    canvas.height = spec.height;
     const t = spec.scenes.length > 0 ? spec.scenes[0].startMs + sceneSettleMs(spec.scenes[0]) : 0;
     renderFrame(ctx as Ctx, spec, t);
   }, [code]);

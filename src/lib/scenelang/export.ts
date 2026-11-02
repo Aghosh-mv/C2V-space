@@ -91,40 +91,97 @@ export async function exportPptx(spec: VideoSpec, onProgress: (p: number) => voi
   await pptx.writeFile({ fileName: 'scenelang-slides.pptx' });
 }
 
-/* ------------------------------- MP4 --------------------------------- */
+/* --------------------------- MP4 compiler ---------------------------- */
+
+function pickAvcCodec(width: number, height: number): string {
+  if (width <= 1280 && height <= 720) return 'avc1.42001f'; // baseline 3.1
+  return 'avc1.640028'; // high 4.0 — 1080p class
+}
 
 /**
- * Convert a recorded WebM blob to MP4 using ffmpeg.wasm.
- * Throws if the wasm core cannot be fetched — caller should fall back to WebM.
+ * COMPILE the timeline into a real .mp4 file — deterministic, frame by frame,
+ * faster than real-time. This is code becoming video, not a screen recording.
+ * Requires the WebCodecs API (Chrome, Edge, Safari 16.4+).
  */
-export async function transcodeWebmToMp4(
-  webm: Blob,
+export async function compileVideoToMp4(
+  spec: VideoSpec,
   onProgress: (p: number) => void,
+  shouldCancel: () => boolean,
 ): Promise<Blob> {
-  const [{ FFmpeg }, { toBlobURL, fetchFile }] = await Promise.all([
-    import('@ffmpeg/ffmpeg'),
-    import('@ffmpeg/util'),
-  ]);
-  const ff = new FFmpeg();
-  ff.on('progress', ({ progress }) => onProgress(Math.min(1, Math.max(0, progress))));
-  const coreBase = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-  const workerBase = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd';
-  await ff.load({
-    coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm'),
-    classWorkerURL: await toBlobURL(`${workerBase}/814.ffmpeg.js`, 'text/javascript'),
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
+    throw new Error('WebCodecs unsupported');
+  }
+  const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
+
+  const width = spec.width - (spec.width % 2);
+  const height = spec.height - (spec.height % 2);
+  const codec = pickAvcCodec(width, height);
+  const config: VideoEncoderConfig = {
+    codec,
+    width,
+    height,
+    bitrate: Math.min(12_000_000, Math.max(3_000_000, width * height * 5)),
+    framerate: spec.fps,
+  };
+  const support = await VideoEncoder.isConfigSupported(config);
+  if (!support.supported) throw new Error('encoder config unsupported');
+
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'avc', width, height },
+    fastStart: 'in-memory',
   });
-  await ff.writeFile('in.webm', await fetchFile(webm));
-  await ff.exec([
-    '-i', 'in.webm',
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-pix_fmt', 'yuv420p',
-    '-movflags', 'faststart',
-    'out.mp4',
-  ]);
-  const data = await ff.readFile('out.mp4');
-  return new Blob([data.buffer as ArrayBuffer], { type: 'video/mp4' });
+
+  let encoderError: Error | null = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => {
+      encoderError = e;
+    },
+  });
+  encoder.configure(config);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = spec.width;
+  canvas.height = spec.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no 2d context');
+
+  const totalFrames = Math.max(1, Math.ceil((spec.totalMs / 1000) * spec.fps));
+  const usPerFrame = 1_000_000 / spec.fps;
+  const keyEvery = Math.max(1, spec.fps * 2);
+
+  for (let f = 0; f < totalFrames; f++) {
+    if (shouldCancel()) {
+      encoder.close();
+      throw new Error('cancelled');
+    }
+    if (encoderError) throw encoderError;
+
+    renderFrame(ctx as Ctx, spec, (f * 1000) / spec.fps);
+    const frame = new VideoFrame(canvas, {
+      timestamp: Math.round(f * usPerFrame),
+      duration: Math.round(usPerFrame),
+    });
+    encoder.encode(frame, { keyFrame: f % keyEvery === 0 });
+    frame.close();
+
+    // gentle backpressure + UI breathing room
+    if (encoder.encodeQueueSize > 24 || f % 6 === 0) {
+      onProgress(f / totalFrames);
+      await new Promise((r) => setTimeout(r, 0));
+      while (encoder.encodeQueueSize > 24) {
+        await new Promise((r) => setTimeout(r, 4));
+      }
+    }
+  }
+
+  onProgress(1);
+  await encoder.flush();
+  encoder.close();
+  muxer.finalize();
+  const buffer = (muxer.target as ArrayBufferTarget).buffer;
+  return new Blob([buffer], { type: 'video/mp4' });
 }
 
 /* ------------------------------- WebM -------------------------------- */

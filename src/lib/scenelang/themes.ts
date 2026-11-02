@@ -1,5 +1,4 @@
-// Theme packs — the "image styles" of SceneLang.
-// A theme is one keyword in code (`theme neon`) that swaps the entire look.
+// Theme packs + a live registry of user-defined StyleKit styles.
 
 export interface ThemeTokens {
   name: string;
@@ -32,20 +31,20 @@ export interface ThemeTokens {
 
 const SANS = '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
 
-export const NEON: ThemeTokens = {
-  name: 'neon',
-  label: 'Neon — cyberpunk glow',
-  bg: ['#0f0c29', '#302b63'],
-  text: '#f4f6ff',
-  dim: 'rgba(244, 246, 255, 0.72)',
-  palette: ['#00f0ff', '#ff2fd6', '#b4ff39', '#ffb347'],
-  glow: true,
-  scanlines: true,
-  particles: 42,
-  gridLine: 'rgba(0, 240, 255, 0.10)',
-  vignette: 'rgba(2, 2, 14, 0.55)',
+export const AURORA: ThemeTokens = {
+  name: 'aurora',
+  label: 'Aurora — smooth & premium',
+  bg: ['#fafafc', '#edeaf7'],
+  text: '#16161d',
+  dim: 'rgba(22, 22, 29, 0.62)',
+  palette: ['#16161d', '#7c6cf0', '#2bb59a', '#f2925c'],
+  glow: false,
+  scanlines: false,
+  particles: 7,
+  gridLine: 'rgba(22, 22, 29, 0.08)',
+  vignette: 'rgba(15, 14, 24, 0.08)',
   font: SANS,
-  letterSpacing: '2px',
+  letterSpacing: '1px',
   titleBar: false,
 };
 
@@ -66,17 +65,44 @@ export const SWISS: ThemeTokens = {
   titleBar: true,
 };
 
-const THEMES: Record<string, ThemeTokens> = {
-  neon: NEON,
+/** Bases that StyleKit styles can inherit from (`base aurora`). */
+export const THEME_DEFAULTS: Record<string, ThemeTokens> = {
+  aurora: AURORA,
   swiss: SWISS,
 };
 
+const BUILTINS: Record<string, ThemeTokens> = {
+  aurora: AURORA,
+  swiss: SWISS,
+};
+
+/** Styles registered from StyleKit code (marketplace imports, user styles). */
+const CUSTOM: Record<string, ThemeTokens> = {};
+
+export function registerStyle(tokens: ThemeTokens) {
+  CUSTOM[tokens.name.toLowerCase()] = tokens;
+}
+
+export function unregisterStyle(name: string) {
+  delete CUSTOM[name.toLowerCase()];
+}
+
+export function knownStyleNames(): string[] {
+  return [...Object.keys(BUILTINS), ...Object.keys(CUSTOM)];
+}
+
 export function getTheme(name: string): ThemeTokens {
-  return THEMES[name.toLowerCase()] ?? NEON;
+  const key = name.toLowerCase();
+  return CUSTOM[key] ?? BUILTINS[key] ?? AURORA;
+}
+
+export function isKnownStyle(name: string): boolean {
+  const key = name.toLowerCase();
+  return key in BUILTINS || key in CUSTOM;
 }
 
 export function themeList(): ThemeTokens[] {
-  return [NEON, SWISS];
+  return [AURORA, SWISS, ...Object.values(CUSTOM)];
 }
 
 /** Rewrite (or insert) the `theme` line in SceneLang code. */
@@ -95,5 +121,16 @@ export function setThemeInCode(code: string, themeName: string): string {
     if (videoIdx >= 0) lines.splice(videoIdx + 1, 0, `theme ${themeName}`);
     else lines.unshift(`theme ${themeName}`);
   }
+  return lines.join('\n');
+}
+
+/** Ensure an `import <name>` line exists in SceneLang code. */
+export function addImportToCode(code: string, styleName: string): string {
+  const lines = code.split('\n');
+  const already = lines.some((l) => /^\s*import\s+[\w-]+/.test(l) && l.trim().endsWith(styleName));
+  if (already) return code;
+  const themeIdx = lines.findIndex((l) => /^\s*theme\s/.test(l));
+  const insertAt = themeIdx >= 0 ? themeIdx : 0;
+  lines.splice(insertAt, 0, `import ${styleName}`);
   return lines.join('\n');
 }
