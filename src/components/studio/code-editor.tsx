@@ -160,6 +160,9 @@ export function CodeEditor({ code, onChange, errors, readOnly, language = 'scene
           <pre
             ref={preRef}
             aria-hidden="true"
+            /* purely decorative highlight overlay derived from `code`; the textarea is the
+               source of truth — ignore transient mismatches (e.g. mid-HMR states) */
+            suppressHydrationWarning
             className={cn(
               'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre p-4',
               FONT_CLASS,
