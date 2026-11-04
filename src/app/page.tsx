@@ -257,6 +257,13 @@ export default function Page() {
     toast.success('Template loaded — make it yours');
   };
 
+  const importEffect = (code: string) => {
+    setSceneCode((c) => (c.trim() ? c.replace(/\n*$/, '\n\n') : '') + code);
+    setEditorTab('scene');
+    setView('studio');
+    toast.success('Effect added to the end of your video — read it, keep it, remix it');
+  };
+
   const loadIntoEditor = (code: string, lang: 'scene' | 'style') => {
     if (lang === 'style') {
       setStyleCode(code);
@@ -539,7 +546,7 @@ export default function Page() {
         {view === 'learn' && <LearnView onLoadCode={loadIntoEditor} />}
 
         {view === 'market' && (
-          <Marketplace onImportStyle={importStyle} onLoadTemplate={loadTemplate} assets={assets} />
+          <Marketplace onImportStyle={importStyle} onLoadTemplate={loadTemplate} onImportEffect={importEffect} assets={assets} />
         )}
 
         {view === 'history' && (
@@ -556,7 +563,7 @@ export default function Page() {
 
       <footer className="mt-auto border-t bg-white/70 py-4">
         <p className="text-center text-[12px] text-zinc-400">
-          SceneLang Studio — you write the code, the compiler films it. Two languages · a learner · a marketplace · your files.
+          SceneLang Studio — free, global, premium. You write the code, the compiler films it.
         </p>
       </footer>
 

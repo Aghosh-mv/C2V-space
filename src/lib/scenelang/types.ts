@@ -2,7 +2,7 @@
 // Philosophy: every action is written out. No bundled "combo" words.
 // Pipeline: SceneLang code -> parser -> VideoSpec (timeline JSON) -> canvas renderer
 
-/** One explicit action on an element, e.g. "fade in 0.6s" or "rise 24 over 0.8s". */
+/** One explicit action on an element, e.g. "fade in 0.6s ease-out delay 200ms". */
 export interface ElemAction {
   kind:
     | 'fade-in'
@@ -17,7 +17,7 @@ export interface ElemAction {
     | 'grow' // bars grow over D
     | 'sweep' // pie sweep over D
     | 'bob'; // sprites bob N over D (looping float)
-  /** ms from element start (computed from preceding `wait`s by the parser) */
+  /** ms from element start (computed from preceding `wait`s + explicit delay) */
   startMs: number;
   /** explicit duration; 0 for instantaneous / not applicable */
   durMs: number;
@@ -31,6 +31,8 @@ export interface ElemAction {
   to?: number;
   /** loop the action (pulse, bob) */
   loop?: boolean;
+  /** easing curve: ease-out (default) | ease-in | ease-in-out | linear */
+  ease?: 'out' | 'in' | 'in-out' | 'linear';
 }
 
 export type SceneTransition = 'crossfade' | 'cut' | 'slide-left' | 'slide-right' | 'zoom';

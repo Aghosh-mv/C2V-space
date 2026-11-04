@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 const FONT_CLASS = 'font-mono text-[12.5px] leading-[20px]';
 
 const SCENE_TOKEN_RE =
-  /(\/\/.*)|("(?:[^"\\]|\\.)*")|(#[0-9a-fA-F]{3,8})|(\{[^}]*\})|(\b(?:video|theme|scene|outro|bg|title|subtitle|text|bars|pie|image|sprite|lines|shape|import|inimportcode|transition)\b)|(\b(?:fade|in|out|rise|drop|slide|left|right|up|down|drift|zoom|from|to|over|spin|stagger|words|letters|items|by|type|on|wait|pulse|grow|sweep|bob|crossfade|cut|gradient|solid|grid|px|ms|deg)\b)|(\b\d+(?:\.\d+)?\b)|(\(|\)|->|:)/g;
+  /(\/\/.*)|("(?:[^"\\]|\\.)*")|(#[0-9a-fA-F]{3,8})|(\{[^}]*\})|(\b(?:video|theme|scene|outro|bg|title|subtitle|text|bars|pie|image|sprite|lines|shape|import|inimportcode|transition)\b)|(\b(?:fade|in|out|rise|drop|slide|left|right|up|down|drift|zoom|from|to|over|spin|stagger|words|letters|items|by|type|on|wait|pulse|grow|sweep|bob|ease|delay|linear|in-out|crossfade|cut|gradient|solid|grid|px|ms|deg)\b)|(\b\d+(?:\.\d+)?\b)|(\(|\)|->|:)/g;
 
 const STYLE_TOKEN_RE =
   /(\/\/.*)|(#[0-9a-fA-F]{3,8})|(rgba?\([^)]*\))|(\b(?:style|bg|ink|dim|accents|font|tracking|glow|vignette|orbs|motion|texture)\b)|(\b(?:on|off|sans|serif|mono)\b)|(\b\d+(?:\.\d+)?\b)/g;

@@ -1,18 +1,19 @@
-// Marketplace — styles, video templates and videos that creators can
-// publish, price, buy (simulated) and import straight into the Studio.
-// The premade catalog (60+ styles, 220+ templates) is browsable here;
-// nothing from it is installed unless you choose it.
+// Marketplace — styles, video templates, effects and videos that creators can
+// publish, price (or give away), buy (simulated) and import into the Studio.
+// The premade catalog (60+ styles, 240+ templates, 24 effect packs) is
+// browsable here and is 100% free — this is a global, premium, free product.
 
 import { CATALOG_STYLES, CATALOG_TEMPLATES } from './catalog';
+import { CATALOG_EFFECTS } from './effects';
 
 export interface MarketItem {
   id: string;
-  kind: 'style' | 'template' | 'video';
+  kind: 'style' | 'template' | 'video' | 'effect';
   title: string;
   author: string;
-  price: number; // 0 = free
+  price: number; // 0 = free (the whole premade catalog is free)
   description: string;
-  /** StyleKit code for styles, SceneLang code for templates & videos */
+  /** StyleKit code for styles, SceneLang code for templates, videos & effects */
   code: string;
   official?: boolean;
   createdAt: number;
@@ -33,7 +34,7 @@ export function catalogItems(): MarketItem[] {
       kind: 'style',
       title: s.title,
       author: s.author,
-      price: s.price,
+      price: 0,
       description: s.description,
       code: s.code,
       official: true,
@@ -44,11 +45,22 @@ export function catalogItems(): MarketItem[] {
       kind: 'template',
       title: t.title,
       author: t.author,
-      price: t.price,
+      price: 0,
       description: t.description,
       code: t.code,
       official: true,
       createdAt: -(100_000 - i),
+    })),
+    ...CATALOG_EFFECTS.map((f, i): MarketItem => ({
+      id: f.id,
+      kind: 'effect',
+      title: f.title,
+      author: f.author,
+      price: 0,
+      description: f.description,
+      code: f.code,
+      official: true,
+      createdAt: -(200_000 - i),
     })),
   ];
   return catalogCache;

@@ -204,55 +204,77 @@ export function parseSceneLang(
 
     // ---- action lines (indented under an element) ------------------------
     if (indent >= 2 && currentElement) {
+      // every action accepts trailing knobs in any order:
+      //   ease out|in|in-out|linear · delay <n>(ms|s)
+      let work = text;
+      let ease: ElemAction['ease'];
+      let delayMs = 0;
+      for (;;) {
+        const easeM = work.match(/\s+ease\s+(out|in|in-out|linear)\s*$/);
+        if (easeM) {
+          ease = easeM[1] as ElemAction['ease'];
+          work = work.slice(0, easeM.index).trimEnd();
+          continue;
+        }
+        const delayM = work.match(/\s+delay\s+(\d+(?:\.\d+)?)(ms|s)?\s*$/);
+        if (delayM) {
+          delayMs += toMs(parseFloat(delayM[1]), delayM[2], 'ms');
+          work = work.slice(0, delayM.index).trimEnd();
+          continue;
+        }
+        break;
+      }
+      const start = waitSoFar + delayMs;
+
       let m: RegExpMatchArray | null;
-      if ((m = text.match(FADE_RE))) {
-        addAction({ kind: m[1] === 'in' ? 'fade-in' : 'fade-out', startMs: waitSoFar, durMs: toMs(parseFloat(m[2]), m[3]) }, line);
+      if ((m = work.match(FADE_RE))) {
+        addAction({ kind: m[1] === 'in' ? 'fade-in' : 'fade-out', startMs: start, durMs: toMs(parseFloat(m[2]), m[3]), ease }, line);
         return;
       }
-      if ((m = text.match(MOVE_RE))) {
+      if ((m = work.match(MOVE_RE))) {
         const verb = m[1];
         let dir: ElemAction['dir'] = m[2] as ElemAction['dir'];
         if (!dir) dir = verb === 'rise' ? 'up' : verb === 'drop' ? 'down' : 'left';
         addAction(
-          { kind: 'move', startMs: waitSoFar, durMs: toMs(parseFloat(m[5]), m[6]), amount: parseFloat(m[3]), dir, loop: verb === 'drift' },
+          { kind: 'move', startMs: start, durMs: toMs(parseFloat(m[5]), m[6]), amount: parseFloat(m[3]), dir, loop: verb === 'drift', ease },
           line,
         );
         return;
       }
-      if ((m = text.match(ZOOM_RE))) {
-        addAction({ kind: 'zoom', startMs: waitSoFar, durMs: toMs(parseFloat(m[3]), m[4]), from: parseFloat(m[1]), to: parseFloat(m[2]) }, line);
+      if ((m = work.match(ZOOM_RE))) {
+        addAction({ kind: 'zoom', startMs: start, durMs: toMs(parseFloat(m[3]), m[4]), from: parseFloat(m[1]), to: parseFloat(m[2]), ease }, line);
         return;
       }
-      if ((m = text.match(SPIN_RE))) {
-        addAction({ kind: 'spin', startMs: waitSoFar, durMs: toMs(parseFloat(m[3]), m[4]), amount: parseFloat(m[1]) }, line);
+      if ((m = work.match(SPIN_RE))) {
+        addAction({ kind: 'spin', startMs: start, durMs: toMs(parseFloat(m[3]), m[4]), amount: parseFloat(m[1]), ease }, line);
         return;
       }
-      if ((m = text.match(STAGGER_RE))) {
-        addAction({ kind: 'stagger', startMs: 0, durMs: 0, unit: m[1] as ElemAction['unit'], amount: toMs(parseFloat(m[2]), m[3], 'ms') }, line);
+      if ((m = work.match(STAGGER_RE))) {
+        addAction({ kind: 'stagger', startMs: 0, durMs: 0, unit: m[1] as ElemAction['unit'], amount: toMs(parseFloat(m[2]), m[3], 'ms'), ease }, line);
         return;
       }
-      if ((m = text.match(TYPE_RE))) {
-        addAction({ kind: 'type', startMs: waitSoFar, durMs: toMs(parseFloat(m[1]), m[2]) }, line);
+      if ((m = work.match(TYPE_RE))) {
+        addAction({ kind: 'type', startMs: start, durMs: toMs(parseFloat(m[1]), m[2]), ease: ease ?? 'linear' }, line);
         return;
       }
-      if ((m = text.match(WAIT_RE))) {
+      if ((m = work.match(WAIT_RE))) {
         waitSoFar += toMs(parseFloat(m[1]), m[2], 'ms');
         return;
       }
-      if ((m = text.match(PULSE_RE))) {
-        addAction({ kind: 'pulse', startMs: waitSoFar, durMs: toMs(parseFloat(m[1]), m[2]), loop: true }, line);
+      if ((m = work.match(PULSE_RE))) {
+        addAction({ kind: 'pulse', startMs: start, durMs: toMs(parseFloat(m[1]), m[2]), loop: true, ease: 'linear' }, line);
         return;
       }
-      if ((m = text.match(GROW_RE))) {
-        addAction({ kind: 'grow', startMs: waitSoFar, durMs: toMs(parseFloat(m[1]), m[2]) }, line);
+      if ((m = work.match(GROW_RE))) {
+        addAction({ kind: 'grow', startMs: start, durMs: toMs(parseFloat(m[1]), m[2]), ease }, line);
         return;
       }
-      if ((m = text.match(SWEEP_RE))) {
-        addAction({ kind: 'sweep', startMs: waitSoFar, durMs: toMs(parseFloat(m[1]), m[2]) }, line);
+      if ((m = work.match(SWEEP_RE))) {
+        addAction({ kind: 'sweep', startMs: start, durMs: toMs(parseFloat(m[1]), m[2]), ease }, line);
         return;
       }
-      if ((m = text.match(BOB_RE))) {
-        addAction({ kind: 'bob', startMs: waitSoFar, durMs: toMs(parseFloat(m[3]), m[4]), amount: parseFloat(m[1]), loop: true }, line);
+      if ((m = work.match(BOB_RE))) {
+        addAction({ kind: 'bob', startMs: start, durMs: toMs(parseFloat(m[3]), m[4]), amount: parseFloat(m[1]), loop: true, ease: 'linear' }, line);
         return;
       }
     }

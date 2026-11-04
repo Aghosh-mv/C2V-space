@@ -103,7 +103,7 @@ export const CATALOG_STYLES: CatalogStyle[] = STYLE_ROWS.map(
     name,
     title: name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
     author: ['atelier', 'velvet', 'clay.co', 'leafstudio', 'petal', 'northform'][i % 6],
-    price: i < 2 ? 0 : [0, 0, 2, 3, 0, 4, 1, 0, 2][i % 9],
+    price: 0,
     description: [
       'A hand-tuned look: soft light, calm palette, premium motion.',
       'Quiet luxury — built for keynotes and slow, confident ads.',
@@ -326,7 +326,7 @@ export const CATALOG_TEMPLATES: CatalogTemplate[] = [
     id: 'cat-tpl-day-ad',
     title: 'Ambient day-long ad loop',
     author: 'clay.co',
-    price: 8,
+    price: 0,
     description:
       'A slow rotating billboard loop — duplicate blocks to stretch it across hours, even a whole day. 600s scenes, explicit crossfade.',
     code: `// A day-long ambient ad — duplicate blocks to fill hours.
@@ -361,7 +361,7 @@ ${title('Quiet. Premium. Present.')}
         id: `cat-tpl-${b.id}-${t.key}`,
         title: `${b.label} — ${t.brand}`,
         author: ['SceneLang', 'clay.co', 'velvet', 'leafstudio', 'petal', 'northform', 'atelier'][i % 7],
-        price: i % 5 === 0 ? 0 : [0, 2, 3, 0, 5, 1, 0, 4][i % 8],
+        price: 0,
         description: `${b.label} structure with ${t.brand} copy — swap the words and ship. ${b.vertical ? 'Vertical 9:16.' : '16:9 landscape.'} Explicit v2 actions throughout.`,
         code: b.build(t, theme),
       };

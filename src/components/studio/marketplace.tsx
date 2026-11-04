@@ -20,6 +20,7 @@ import type { AssetRef } from '@/lib/scenelang/types';
 interface Props {
   onImportStyle: (code: string, name: string) => void;
   onLoadTemplate: (code: string) => void;
+  onImportEffect: (code: string) => void;
   assets: AssetRef[];
 }
 
@@ -48,6 +49,7 @@ function KindBadge({ kind }: { kind: MarketItem['kind'] }) {
     style: { icon: Gem, label: 'style' },
     template: { icon: LayoutTemplate, label: 'template' },
     video: { icon: Store, label: 'video' },
+    effect: { icon: Sparkles, label: 'effect' },
   } as const;
   const { icon: Icon, label } = map[kind];
   return (
@@ -59,10 +61,10 @@ function KindBadge({ kind }: { kind: MarketItem['kind'] }) {
 
 const PAGE = 24;
 
-export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
+export function Marketplace({ onImportStyle, onLoadTemplate, onImportEffect, assets }: Props) {
   const [items] = useState<MarketItem[]>(() => loadMarket());
   const [owned, setOwned] = useState<string[]>(() => loadOwned());
-  const [filter, setFilter] = useState<'all' | 'style' | 'template' | 'video'>('all');
+  const [filter, setFilter] = useState<'all' | 'style' | 'template' | 'video' | 'effect'>('all');
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<MarketItem | null>(null);
   const [shownCount, setShownCount] = useState(PAGE);
@@ -85,6 +87,8 @@ export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
   const importNow = (item: MarketItem) => {
     if (item.kind === 'style') {
       onImportStyle(item.code, item.title);
+    } else if (item.kind === 'effect') {
+      onImportEffect(item.code);
     } else {
       onLoadTemplate(item.code);
     }
@@ -98,7 +102,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
           <Store className="h-5 w-5 text-violet-600" /> Marketplace
         </h1>
         <p className="mt-1 text-[13.5px] text-zinc-500">
-          Buy styles and templates from other creators — or publish your own from the Studio and sell them.
+          A global, premium, free catalog — every premade style, template and effect pack is free. Creators can still price their own work.
         </p>
       </div>
 
@@ -116,7 +120,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
           />
         </div>
         <div className="flex rounded-full border bg-white p-1 shadow-sm">
-          {(['all', 'style', 'template', 'video'] as const).map((f) => {
+          {(['all', 'style', 'template', 'effect', 'video'] as const).map((f) => {
             const count = f === 'all' ? items.length : items.filter((i) => i.kind === f).length;
             return (
               <button
@@ -131,7 +135,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
                   filter === f ? 'bg-violet-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-800',
                 )}
               >
-                {f === 'all' ? 'everything' : `${f}s`} · {count}
+                {f === 'all' ? 'everything' : f === 'effect' ? 'effects' : `${f}s`} · {count}
               </button>
             );
           })}
@@ -245,7 +249,11 @@ export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
                   className="gap-2 rounded-full"
                 >
                   <Download className="h-4 w-4" />
-                  {detail.kind === 'style' ? 'Import into my video' : 'Open in Studio'}
+                  {detail.kind === 'style'
+                    ? 'Import into my video'
+                    : detail.kind === 'effect'
+                      ? 'Add effect to my video'
+                      : 'Open in Studio'}
                 </Button>
               </div>
             </>

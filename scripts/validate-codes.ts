@@ -4,6 +4,7 @@
 import { parseSceneLang } from '../src/lib/scenelang/parser';
 import { parseStyleKit } from '../src/lib/scenelang/stylekit';
 import { CATALOG_STYLES, CATALOG_TEMPLATES } from '../src/lib/scenelang/catalog';
+import { CATALOG_EFFECTS } from '../src/lib/scenelang/effects';
 import { LIBRARY } from '../src/lib/scenelang/learn';
 import { SAMPLES } from '../src/lib/scenelang/samples';
 
@@ -39,10 +40,23 @@ for (const s of CATALOG_STYLES) checkStyle(`style ${s.name}`, s.code);
 // 2. catalog templates must parse as SceneLang (themes referencing catalog styles are allowed)
 for (const t of CATALOG_TEMPLATES) checkScene(`template ${t.id}`, t.code, true);
 
-// 3. samples
+// 3. effects — must parse with NO errors (no theme needed since they're scene snippets)
+for (const f of CATALOG_EFFECTS) {
+  const { errors } = parseSceneLang(f.code, styleNames, ['logo.png', 'hero.png', 'terrain.jpg', 'dialogue.txt', 'data.csv']);
+  const real = errors.filter((e) => !/declare the look/i.test(e.message));
+  if (real.length > 0) {
+    failures++;
+    console.log(`✗ effect ${f.id}`);
+    for (const e of real.slice(0, 4)) console.log(`   line ${e.line}: ${e.message}`);
+  } else {
+    console.log(`✓ effect ${f.id}`);
+  }
+}
+
+// 4. samples
 for (const s of SAMPLES) checkScene(`sample ${s.id}`, s.code);
 
-// 4. learn library: scene tutorials parse as SceneLang, style ones as StyleKit
+// 5. learn library: scene tutorials parse as SceneLang, style ones as StyleKit
 for (const section of LIBRARY) {
   for (const tut of section.tutorials) {
     if (tut.lang === 'scene') checkScene(`learn ${tut.id}`, tut.code, true);

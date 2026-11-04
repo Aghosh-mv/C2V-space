@@ -110,27 +110,25 @@ scene tour (6s)
     wait 400ms
     rise 10 over 0.5s`),
       S('philosophy', 'Name every action', 3, 'scene',
-        'v2 has no magic combo words. kinetic did four things at once — now you write the four things, and anything else you want.',
+        'v2 has no magic combo words. kinetic did four things at once — now you write the four things, with an ease curve and a delay on each.',
         [
-          'one action per line, indented under its element',
-          'actions run in parallel; wait is the sequencer',
+          'one action per line, indented under its element — and each line is a small program: verb + numbers + ease + delay',
+          'actions run in parallel; wait and delay are the sequencers',
           'elements cascade gently in order (140ms apart) — the only automatic timing left',
           'old combo words are flagged with hints that show the explicit replacement',
         ],
         `video 1280x720 30fps
 theme aurora
 
-scene kinetic-then-v2 (5s)
+scene explicit (5s)
   transition crossfade 0.85s
   title "Words that move"
-    fade in 0.55s
-    rise 22 over 0.6s
-    stagger words by 90ms
+    fade in 0.55s ease out
+    rise 22 over 0.6s ease out
+    stagger words by 90ms ease out
   subtitle "each action, written out"
-    fade in 0.5s
-    wait 300ms
-    rise 12 over 0.5s
-    spin 0 over 0.5s`),
+    fade in 0.5s ease out delay 300ms
+    rise 12 over 0.5s ease out`),
     ],
   },
   {
@@ -138,12 +136,13 @@ scene kinetic-then-v2 (5s)
     title: 'Actions in depth',
     blurb: 'The full action vocabulary. Every visual thing that happens is one of these lines.',
     tutorials: [
-      S('fade', 'fade in / fade out', 2, 'scene',
-        'The breathing of the timeline. Fade anything in when it arrives, out before it leaves.',
+      S('fade', 'fade in / fade out — with ease & delay', 2, 'scene',
+        'The breathing of the timeline. Every action also accepts two knobs: an easing curve and a delay.',
         [
-          'fade in 0.6s — element is invisible until its moment, then eases up over 0.6s',
-          'fade out 0.4s — multiplies on top of the fade-in, so exits are clean',
-          'no fade lines? the element is simply present — honest defaults',
+          'fade in 0.6s ease out — element is invisible until its moment, then eases up',
+          'the ease knob: ease out (default) · ease in · ease in-out · linear',
+          'the delay knob: delay 400ms pushes this one action back without touching the others',
+          'fade out 0.4s ease in — multiplies on top of the fade-in, so exits are clean',
         ],
         `video 1280x720 30fps
 theme aurora
@@ -151,21 +150,21 @@ theme aurora
 scene fades (5s)
   transition crossfade 0.85s
   title "In, then out."
-    fade in 0.5s
-    fade out 0.8s
-  subtitle "the body copy arrives late and stays"
-    fade in 0.6s
-    wait 900ms
-  text "you control every entrance and every exit"
-    fade in 0.5s
-    wait 1600ms
-    rise 12 over 0.5s`),
-      S('move', 'rise, drop, slide', 3, 'scene',
-        'Movement with a distance and a duration. rise 24 over 0.6s lifts 24 pixels, easing out like a settled breath.',
+    fade in 0.5s ease out
+    fade out 0.8s ease in
+  subtitle "delayed, then risen"
+    fade in 0.6s ease out delay 500ms
+    rise 14 over 0.5s ease out
+  text "every action is one line with its own knobs"
+    fade in 0.5s ease out delay 1.2s
+    rise 12 over 0.5s ease out`),
+      S('move', 'rise, drop, slide — with easing', 3, 'scene',
+        'Movement with a distance, a duration and a curve. rise 24 over 0.6s ease out lifts 24 pixels and settles like a breath.',
         [
           'rise N over D — drifts up N px · drop N over D — sinks down',
           'slide left N over D / slide right N over D — horizontal moves',
-          'distances are small for taste: 10-40px reads premium, 200px reads cartoon',
+          'curves change personality: ease out settles, ease in falls, ease in-out glides',
+          'distances stay small for taste: 10-40px reads premium, 200px reads cartoon',
         ],
         `video 1280x720 30fps
 theme swiss
@@ -173,16 +172,14 @@ theme swiss
 scene moves (5s)
   transition slide-left 0.7s
   title "Slide right in."
-    fade in 0.4s
-    slide right 60 over 0.7s
+    fade in 0.4s ease out
+    slide right 60 over 0.8s ease in-out
   subtitle "drop into place"
-    fade in 0.5s
-    wait 300ms
-    drop 18 over 0.6s
+    fade in 0.5s ease out delay 300ms
+    drop 18 over 0.6s ease out
   text "rise feels like relief; drop feels like arrival"
-    fade in 0.5s
-    wait 700ms
-    rise 14 over 0.6s`),
+    fade in 0.5s ease out delay 700ms
+    rise 14 over 0.6s ease out`),
       S('drift-zoom', 'drift & zoom — the Ken Burns pair', 3, 'scene',
         'Slow continuous moves make stills cinematic. drift runs linear across its whole duration — perfect for photos and backgrounds.',
         [
@@ -250,9 +247,9 @@ scene story (6s)
         'stagger splits an element into words, letters or items and offsets each copy of the motion. wait is the pause button between actions.',
         [
           'stagger words by 90ms — the kinetic title, rebuilt from parts you own',
-          'stagger letters by 40ms — spell-out energy',
-          'stagger items by 120ms — bars and pie legends arrive one by one',
-          'wait 400ms delays every action after it — the only sequencing word',
+          'stagger letters by 40ms — spell-out energy · stagger items by 120ms — charts land one by one',
+          'wait 400ms delays every action after it; delay 400ms on one line delays just that line',
+          'combine knobs: grow over 0.9s ease in-out after a wait, stagger items by 150ms ease out',
         ],
         `video 1280x720 30fps
 theme aurora
@@ -260,18 +257,16 @@ theme aurora
 scene choreography (6s)
   transition crossfade 0.85s
   title "Every word lands alone"
-    fade in 0.5s
-    rise 24 over 0.6s
-    stagger words by 110ms
+    fade in 0.5s ease out
+    rise 24 over 0.6s ease out
+    stagger words by 110ms ease out
   subtitle "letters can spell it out"
-    fade in 0.4s
-    wait 1200ms
-    stagger letters by 40ms
+    fade in 0.4s ease out delay 1200ms
+    stagger letters by 40ms ease out
   bars {One:30, Two:60, Three:90}
-    fade in 0.4s
     wait 2200ms
-    grow over 0.9s
-    stagger items by 150ms`),
+    grow over 0.9s ease in-out
+    stagger items by 150ms ease out`),
     ],
   },
   {

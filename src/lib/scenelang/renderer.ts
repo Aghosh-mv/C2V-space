@@ -13,10 +13,25 @@ type Ctx = CanvasRenderingContext2D & { letterSpacing?: string };
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const easeOutQuint = (p: number) => 1 - Math.pow(1 - p, 5);
+const easeInQuint = (p: number) => p * p * p * p * p;
 const easeInOutQuint = (p: number) =>
   p < 0.5 ? 16 * p * p * p * p * p : 1 - Math.pow(-2 * p + 2, 5) / 2;
 const easeOutQuart = (p: number) => 1 - Math.pow(1 - p, 4);
 const linear = (p: number) => p;
+
+/** the curve an action declared:  ease out (default) | ease in | ease in-out | linear */
+function easeFor(a: ElemAction): (p: number) => number {
+  switch (a.ease) {
+    case 'linear':
+      return linear;
+    case 'in':
+      return easeInQuint;
+    case 'in-out':
+      return easeInOutQuint;
+    default:
+      return easeOutQuint;
+  }
+}
 
 /* --------------------------- image cache ---------------------------- */
 
@@ -170,7 +185,7 @@ export function evalActions(
     const t = elT - baseDelay - a.startMs;
     switch (a.kind) {
       case 'fade-in': {
-        fadeInP = Math.max(fadeInP, t < 0 ? 0 : easeOutQuint(clamp01(t / Math.max(1, a.durMs))));
+        fadeInP = Math.max(fadeInP, t < 0 ? 0 : easeFor(a)(clamp01(t / Math.max(1, a.durMs))));
         break;
       }
       case 'fade-out': {
@@ -179,7 +194,7 @@ export function evalActions(
       }
       case 'move': {
         if (t < 0) break;
-        const p = (a.loop ? linear : easeOutQuint)(clamp01(t / Math.max(1, a.durMs)));
+        const p = (a.ease === 'linear' || a.loop ? linear : easeFor(a))(clamp01(t / Math.max(1, a.durMs)));
         const d = (a.amount ?? 0) * p;
         if (a.dir === 'up') s.dy -= d;
         else if (a.dir === 'down') s.dy += d;
@@ -192,17 +207,18 @@ export function evalActions(
           s.scale *= (a.from ?? 100) / 100;
           break;
         }
-        const p = easeInOutQuint(clamp01(t / Math.max(1, a.durMs)));
+        const p = easeFor(a)(clamp01(t / Math.max(1, a.durMs)));
         s.scale *= ((a.from ?? 100) + ((a.to ?? 100) - (a.from ?? 100)) * p) / 100;
         break;
       }
       case 'spin': {
         if (t < 0) break;
-        s.rot += (a.amount ?? 0) * easeInOutQuint(clamp01(t / Math.max(1, a.durMs)));
+        s.rot += (a.amount ?? 0) * easeFor(a)(clamp01(t / Math.max(1, a.durMs)));
         break;
       }
       case 'type': {
-        s.reveal = t < 0 ? 0 : clamp01(t / Math.max(1, a.durMs));
+        const p = clamp01(t / Math.max(1, a.durMs));
+        s.reveal = t < 0 ? 0 : a.ease && a.ease !== 'linear' ? easeFor(a)(p) : p;
         break;
       }
       case 'stagger': {
@@ -211,11 +227,11 @@ export function evalActions(
         break;
       }
       case 'grow': {
-        s.growP = t < 0 ? 0 : easeOutQuart(clamp01(t / Math.max(1, a.durMs)));
+        s.growP = t < 0 ? 0 : (a.ease === 'in-out' ? easeInOutQuint : easeOutQuart)(clamp01(t / Math.max(1, a.durMs)));
         break;
       }
       case 'sweep': {
-        s.sweepP = t < 0 ? 0 : easeInOutQuint(clamp01(t / Math.max(1, a.durMs)));
+        s.sweepP = t < 0 ? 0 : easeFor(a)(clamp01(t / Math.max(1, a.durMs)));
         break;
       }
       case 'bob': {
@@ -244,8 +260,10 @@ function unitProgress(actions: ElemAction[], unitT: number): { p: number; dy: nu
   const fade = actions.find((a) => a.kind === 'fade-in');
   const rise = actions.find((a) => a.kind === 'move' && (a.dir === 'up' || a.dir === 'down'));
   const zoomA = actions.find((a) => a.kind === 'zoom');
-  const p = easeOutQuint(clamp01(unitT / Math.max(1, fade?.durMs ?? 450)));
-  const dy = rise ? -(rise.amount ?? 0) * (1 - easeOutQuint(clamp01(unitT / Math.max(1, rise.durMs)))) : 0;
+  const p = (fade ? easeFor(fade) : easeOutQuint)(clamp01(unitT / Math.max(1, fade?.durMs ?? 450)));
+  const dy = rise
+    ? -(rise.amount ?? 0) * (1 - easeFor(rise)(clamp01(unitT / Math.max(1, rise.durMs))))
+    : 0;
   let scale = 1;
   if (zoomA) scale = ((zoomA.from ?? 96) + ((zoomA.to ?? 100) - (zoomA.from ?? 96)) * p) / 100;
   return { p, dy, scale };
