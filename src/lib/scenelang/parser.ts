@@ -139,8 +139,7 @@ export function parseSceneLang(
   let width = 1280;
   let height = 720;
   let fps = 30;
-  let theme = 'aurora';
-  let sawTheme = false;
+  let theme: string | null = null; // no default — no theme line means a bare, unstyled render
   const imports = new Set<string>();
   const scenes: Scene[] = [];
   let current: Scene | null = null;
@@ -184,7 +183,6 @@ export function parseSceneLang(
     const themeMatch = text.match(THEME_RE);
     if (themeMatch) {
       theme = themeMatch[1].toLowerCase();
-      sawTheme = true;
       return;
     }
 
@@ -424,16 +422,18 @@ export function parseSceneLang(
     errors.push({ line, message: `I don't understand "${text}" — every action gets its own line; see the Learner for the full library` });
   });
 
-  if (scenes.length > 0 && !sawTheme) {
+  // no theme declared? render bare and teach the line — never apply a default style
+  if (scenes.length > 0 && theme === null) {
     errors.push({
       line: 0,
-      message: 'declare the look — add a theme line near the top:  theme aurora  (or any style name from the Marketplace)',
+      message: 'no theme declared — rendering bare. choose a look with a theme line:  theme aurora  or  theme swiss  (or any Marketplace style)',
     });
   }
+  const resolvedTheme = theme ?? 'plain';
 
   if (scenes.length === 0) {
     return {
-      spec: { width, height, fps, theme, scenes: [], totalMs: 0 },
+      spec: { width, height, fps, theme: resolvedTheme, scenes: [], totalMs: 0 },
       errors,
     };
   }
@@ -454,15 +454,15 @@ export function parseSceneLang(
   }
 
   // theme must be built-in, imported, or installed from the marketplace
-  const known = new Set(['aurora', 'swiss', ...imports, ...knownStyles.map((s) => s.toLowerCase())]);
-  if (!known.has(theme)) {
+  const known = new Set(['plain', 'aurora', 'swiss', ...imports, ...knownStyles.map((s) => s.toLowerCase())]);
+  if (!known.has(resolvedTheme)) {
     errors.push({
       line: 0,
-      message: `style "${theme}" isn't installed — open the Marketplace to get it, or add "import ${theme}" above the theme line`,
+      message: `style "${resolvedTheme}" isn't installed — open the Marketplace to get it, or add "import ${resolvedTheme}" above the theme line`,
     });
   }
 
-  const spec: VideoSpec = { width, height, fps, theme, scenes, totalMs };
+  const spec: VideoSpec = { width, height, fps, theme: resolvedTheme, scenes, totalMs };
   return { spec, errors };
 }
 

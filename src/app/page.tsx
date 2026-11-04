@@ -43,6 +43,31 @@ type View = 'studio' | 'learn' | 'market' | 'history';
 const SCENE_KEY = 'scenelang.scene';
 const STYLE_KEY = 'scenelang.style';
 
+// The pre-v2 build auto-loaded this sample and auto-saved it — visitors never wrote it.
+// If it is still sitting in storage, wipe it so the studio truly opens blank.
+const LEGACY_DEFAULT_CODE = `// Welcome to SceneLang — code that becomes video.
+// Edit anything; the preview updates instantly.
+
+video 1280x720 30fps
+theme aurora
+
+scene hello (4s) fade
+  title "I write code." kinetic
+  subtitle "and it becomes a video" typewriter
+
+scene numbers (4.5s) fade-up
+  title "Watch the data move" pop
+  bars {Design:82, Speed:64, Fun:91} grow
+
+scene share (3.5s) zoom-in
+  pie {Aurora:55, Swiss:30, More:15} spin
+  subtitle "two style packs" fade
+
+scene bye (3s) fade
+  title "Your turn." kinetic
+  text "Edit this code, press play, export a real video file." fade-up
+`;
+
 export default function Page() {
   const [view, setView] = useState<View>('studio');
   const [sceneCode, setSceneCode] = useState('');
@@ -78,7 +103,10 @@ export default function Page() {
       setSessions(listSessions());
       const s = window.localStorage.getItem(SCENE_KEY);
       const st = window.localStorage.getItem(STYLE_KEY);
-      if (s) {
+      if (s && s.trim() === LEGACY_DEFAULT_CODE.trim()) {
+        // pre-v2 default that was never written by the user — honor “no default code”
+        window.localStorage.removeItem(SCENE_KEY);
+      } else if (s) {
         setSceneCode(s);
         setDebouncedScene(s);
       }

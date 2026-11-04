@@ -65,7 +65,27 @@ export const SWISS: ThemeTokens = {
   titleBar: true,
 };
 
-/** Builtin looks that SceneLang's `theme` line accepts out of the box. */
+/** The bare, unstyled look — what renders when no theme was declared at all.
+ *  Not a style you can pick: it is the absence of one. */
+export const PLAIN: ThemeTokens = {
+  name: 'plain',
+  label: 'Plain — unstyled',
+  bg: ['#ffffff', '#f4f4f5'],
+  text: '#18181b',
+  dim: 'rgba(24, 24, 27, 0.55)',
+  palette: ['#18181b', '#52525b', '#a1a1aa', '#d4d4d8'],
+  glow: false,
+  scanlines: false,
+  particles: 0,
+  gridLine: 'rgba(24, 24, 27, 0.07)',
+  vignette: 'none',
+  font: SANS,
+  letterSpacing: '0px',
+  titleBar: false,
+};
+
+/** Builtin looks that SceneLang's `theme` line accepts out of the box —
+ *  applied only when explicitly written, never as a default. */
 const BUILTINS: Record<string, ThemeTokens> = {
   aurora: AURORA,
   swiss: SWISS,
@@ -88,7 +108,7 @@ export function knownStyleNames(): string[] {
 
 export function getTheme(name: string): ThemeTokens {
   const key = name.toLowerCase();
-  return CUSTOM[key] ?? BUILTINS[key] ?? AURORA;
+  return CUSTOM[key] ?? BUILTINS[key] ?? PLAIN;
 }
 
 export function isKnownStyle(name: string): boolean {
