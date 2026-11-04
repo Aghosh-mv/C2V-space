@@ -169,7 +169,10 @@ export function CodeEditor({ code, onChange, errors, readOnly, language = 'scene
               'text-zinc-800',
             )}
           >
-            {highlighted}
+          {/* guard span first: the HTML parser drops a newline that directly follows
+              <pre> — without this, an empty/leading-blank-line buffer hydrates empty */}
+          <span aria-hidden="true" />
+          {highlighted}
           </pre>
           <textarea
             ref={taRef}
