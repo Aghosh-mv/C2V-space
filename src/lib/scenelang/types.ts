@@ -1,19 +1,46 @@
-// SceneLang — core scene-graph types
+// SceneLang v2 — core scene-graph types.
+// Philosophy: every action is written out. No bundled "combo" words.
 // Pipeline: SceneLang code -> parser -> VideoSpec (timeline JSON) -> canvas renderer
 
-export type EnterAnim =
-  | 'fade'
-  | 'fade-up'
-  | 'slide-left'
-  | 'slide-right'
-  | 'zoom-in'
-  | 'none';
+/** One explicit action on an element, e.g. "fade in 0.6s" or "rise 24 over 0.8s". */
+export interface ElemAction {
+  kind:
+    | 'fade-in'
+    | 'fade-out'
+    | 'move' // rise / drop / slide left / slide right / drift
+    | 'zoom' // zoom from X to Y over D
+    | 'spin' // spin Ndeg over D
+    | 'stagger' // stagger words|letters|items by N
+    | 'type' // type on over D
+    | 'wait' // wait N
+    | 'pulse' // pulse D (looping breath)
+    | 'grow' // bars grow over D
+    | 'sweep' // pie sweep over D
+    | 'bob'; // sprites bob N over D (looping float)
+  /** ms from element start (computed from preceding `wait`s by the parser) */
+  startMs: number;
+  /** explicit duration; 0 for instantaneous / not applicable */
+  durMs: number;
+  /** movement distance in px (move, bob) or degrees (spin) */
+  amount?: number;
+  /** movement or stagger unit */
+  dir?: 'up' | 'down' | 'left' | 'right';
+  unit?: 'words' | 'letters' | 'items';
+  /** zoom range in percent (e.g. 100 -> 112) */
+  from?: number;
+  to?: number;
+  /** loop the action (pulse, bob) */
+  loop?: boolean;
+}
 
-export type TextAnim = 'kinetic' | 'typewriter' | 'pop' | 'fade' | 'fade-up';
+export type SceneTransition = 'crossfade' | 'cut' | 'slide-left' | 'slide-right' | 'zoom';
 
-export type ChartAnim = 'grow' | 'spin' | 'pop' | 'fade';
+export interface Transition {
+  kind: SceneTransition;
+  ms: number;
+}
 
-export type BgVariant = 'gradient' | 'solid' | 'grid';
+export type BgVariant = 'gradient' | 'solid' | 'grid' | 'image';
 
 export type ShapeVariant = 'circle' | 'ring' | 'rect';
 
@@ -22,22 +49,34 @@ export interface ChartPoint {
   value: number;
 }
 
+/** A user-imported file, referenced by name in code. */
+export interface AssetRef {
+  name: string;
+  kind: 'image' | 'text' | 'csv';
+  /** data URL for images */
+  dataUrl?: string;
+  /** raw content for text/csv */
+  content?: string;
+}
+
 export type SceneElement =
   | {
       kind: 'bg';
       variant: BgVariant;
       colors: string[];
-      anim: 'pulse' | 'none';
+      src?: string; // for bg image
+      actions: ElemAction[];
     }
-  | { kind: 'title' | 'subtitle' | 'text'; text: string; anim: TextAnim }
-  | { kind: 'bars' | 'pie'; data: ChartPoint[]; anim: ChartAnim }
-  | { kind: 'image'; src: string; anim: 'zoom-in' | 'pan' | 'fade' }
-  | { kind: 'shape'; variant: ShapeVariant; anim: 'pulse' | 'glow' | 'fade' };
+  | { kind: 'title' | 'subtitle' | 'text'; text: string; actions: ElemAction[] }
+  | { kind: 'bars' | 'pie'; data: ChartPoint[]; from?: string; actions: ElemAction[] }
+  | { kind: 'image' | 'sprite'; src: string; actions: ElemAction[] }
+  | { kind: 'lines'; name: string; items: string[]; actions: ElemAction[] }
+  | { kind: 'shape'; variant: ShapeVariant; actions: ElemAction[] };
 
 export interface Scene {
   name: string;
   durationMs: number;
-  enter: EnterAnim;
+  transition: Transition;
   elements: SceneElement[];
   /** computed by parser */
   startMs: number;

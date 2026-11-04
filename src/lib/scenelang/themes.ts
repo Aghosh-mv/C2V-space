@@ -11,7 +11,7 @@ export interface ThemeTokens {
   dim: string;
   /** chart / accent palette */
   palette: string[];
-  /** neon glow effects on/off */
+  /** neon glow effects on/off — off everywhere, we stay smooth */
   glow: boolean;
   /** scanline overlay on/off */
   scanlines: boolean;
@@ -65,12 +65,7 @@ export const SWISS: ThemeTokens = {
   titleBar: true,
 };
 
-/** Bases that StyleKit styles can inherit from (`base aurora`). */
-export const THEME_DEFAULTS: Record<string, ThemeTokens> = {
-  aurora: AURORA,
-  swiss: SWISS,
-};
-
+/** Builtin looks that SceneLang's `theme` line accepts out of the box. */
 const BUILTINS: Record<string, ThemeTokens> = {
   aurora: AURORA,
   swiss: SWISS,

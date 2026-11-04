@@ -1,9 +1,13 @@
 // Export toolkit — WebM (recorder), MP4 (ffmpeg.wasm), PDF & PPTX (slide stills).
 
 import { renderFrame, sceneSettleMs } from './renderer';
-import type { VideoSpec } from './types';
+import type { AssetRef, VideoSpec } from './types';
 
 export type Ctx = CanvasRenderingContext2D & { letterSpacing?: string };
+
+export function toAssetMap(assets?: AssetRef[]): Map<string, AssetRef> | undefined {
+  return assets && assets.length > 0 ? new Map(assets.map((a) => [a.name.toLowerCase(), a])) : undefined;
+}
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -19,25 +23,25 @@ export function downloadBlob(blob: Blob, filename: string) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Render a single still of a scene (fully settled) and return a JPEG data URL. */
-export function sceneStillUrl(spec: VideoSpec, sceneIndex: number): string {
+export function sceneStillUrl(spec: VideoSpec, sceneIndex: number, assets?: AssetRef[]): string {
   const c = document.createElement('canvas');
   c.width = spec.width;
   c.height = spec.height;
   const ctx = c.getContext('2d');
   if (ctx && spec.scenes[sceneIndex]) {
     const scene = spec.scenes[sceneIndex];
-    renderFrame(ctx as Ctx, spec, scene.startMs + sceneSettleMs(scene));
+    renderFrame(ctx as Ctx, spec, scene.startMs + sceneSettleMs(scene), toAssetMap(assets));
   }
   return c.toDataURL('image/jpeg', 0.92);
 }
 
 /** Render a still at an arbitrary time (used for thumbnails). */
-export function stillUrlAt(spec: VideoSpec, timeMs: number, maxWidth = 480): string {
+export function stillUrlAt(spec: VideoSpec, timeMs: number, maxWidth = 480, assets?: AssetRef[]): string {
   const c = document.createElement('canvas');
   c.width = spec.width;
   c.height = spec.height;
   const ctx = c.getContext('2d');
-  if (ctx) renderFrame(ctx as Ctx, spec, timeMs);
+  if (ctx) renderFrame(ctx as Ctx, spec, timeMs, toAssetMap(assets));
   if (c.width > maxWidth) {
     const scale = maxWidth / c.width;
     const small = document.createElement('canvas');
@@ -52,7 +56,7 @@ export function stillUrlAt(spec: VideoSpec, timeMs: number, maxWidth = 480): str
 
 /* ------------------------------- PDF -------------------------------- */
 
-export async function exportPdf(spec: VideoSpec, onProgress: (p: number) => void) {
+export async function exportPdf(spec: VideoSpec, onProgress: (p: number) => void, assets?: AssetRef[]) {
   const { jsPDF } = await import('jspdf');
   const landscape = spec.width >= spec.height;
   const pdf = new jsPDF({
@@ -64,7 +68,7 @@ export async function exportPdf(spec: VideoSpec, onProgress: (p: number) => void
   });
   for (let i = 0; i < spec.scenes.length; i++) {
     if (i > 0) pdf.addPage([spec.width, spec.height], landscape ? 'landscape' : 'portrait');
-    pdf.addImage(sceneStillUrl(spec, i), 'JPEG', 0, 0, spec.width, spec.height);
+    pdf.addImage(sceneStillUrl(spec, i, assets), 'JPEG', 0, 0, spec.width, spec.height);
     onProgress((i + 1) / spec.scenes.length);
     await sleep(24);
   }
@@ -73,7 +77,7 @@ export async function exportPdf(spec: VideoSpec, onProgress: (p: number) => void
 
 /* ------------------------------- PPTX -------------------------------- */
 
-export async function exportPptx(spec: VideoSpec, onProgress: (p: number) => void) {
+export async function exportPptx(spec: VideoSpec, onProgress: (p: number) => void, assets?: AssetRef[]) {
   const mod = await import('pptxgenjs');
   const PptxGenJS = mod.default;
   const pptx = new PptxGenJS();
@@ -84,7 +88,7 @@ export async function exportPptx(spec: VideoSpec, onProgress: (p: number) => voi
   pptx.title = 'SceneLang Slides';
   for (let i = 0; i < spec.scenes.length; i++) {
     const slide = pptx.addSlide();
-    slide.addImage({ data: sceneStillUrl(spec, i), x: 0, y: 0, w: wIn, h: hIn });
+    slide.addImage({ data: sceneStillUrl(spec, i, assets), x: 0, y: 0, w: wIn, h: hIn });
     onProgress((i + 1) / spec.scenes.length);
     await sleep(24);
   }
@@ -107,6 +111,7 @@ export async function compileVideoToMp4(
   spec: VideoSpec,
   onProgress: (p: number) => void,
   shouldCancel: () => boolean,
+  assets?: AssetRef[],
 ): Promise<Blob> {
   if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
     throw new Error('WebCodecs unsupported');
@@ -158,7 +163,7 @@ export async function compileVideoToMp4(
     }
     if (encoderError) throw encoderError;
 
-    renderFrame(ctx as Ctx, spec, (f * 1000) / spec.fps);
+    renderFrame(ctx as Ctx, spec, (f * 1000) / spec.fps, toAssetMap(assets));
     const frame = new VideoFrame(canvas, {
       timestamp: Math.round(f * usPerFrame),
       duration: Math.round(usPerFrame),

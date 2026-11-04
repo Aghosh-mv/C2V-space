@@ -30,9 +30,10 @@ import {
   exportPdf,
   exportPptx,
   pickRecorderMime,
+  toAssetMap,
   type Ctx,
 } from '@/lib/scenelang/export';
-import type { VideoSpec } from '@/lib/scenelang/types';
+import type { AssetRef, VideoSpec } from '@/lib/scenelang/types';
 import { cn } from '@/lib/utils';
 import { Timeline } from './timeline';
 
@@ -43,13 +44,16 @@ interface Props {
   spec: VideoSpec;
   exporting: boolean;
   exportLabel: string;
+  assets: AssetRef[];
   onExportingChange: (busy: boolean, label: string) => void;
 }
 
-export function Player({ spec, exporting, exportLabel, onExportingChange }: Props) {
+export function Player({ spec, exporting, exportLabel, assets, onExportingChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
 
   const [mode, setMode] = useState<Mode>('anim');
   const [playing, setPlaying] = useState(false);
@@ -113,7 +117,7 @@ export function Player({ spec, exporting, exportLabel, onExportingChange }: Prop
         }
         canvas.width = s.width;
         canvas.height = s.height;
-        renderFrame(ctx as Ctx, s, time);
+        renderFrame(ctx as Ctx, s, time, toAssetMap(assetsRef.current));
       }
       raf = requestAnimationFrame(tick);
     };
@@ -253,6 +257,7 @@ export function Player({ spec, exporting, exportLabel, onExportingChange }: Prop
               specRef.current,
               (p) => onExportingChange(true, `Compiling video… ${Math.round(p * 100)}%`),
               () => cancelRef.current,
+              assetsRef.current,
             );
             downloadBlob(mp4, 'scenelang-video.mp4');
             toast.success('Video compiled to MP4 — made entirely from your code');
@@ -276,11 +281,13 @@ export function Player({ spec, exporting, exportLabel, onExportingChange }: Prop
           if (kind === 'pdf') {
             await exportPdf(specRef.current, (p) =>
               onExportingChange(true, `Rendering slides… ${Math.round(p * 100)}%`),
+              assetsRef.current,
             );
             toast.success('Slides saved as PDF');
           } else {
             await exportPptx(specRef.current, (p) =>
               onExportingChange(true, `Rendering slides… ${Math.round(p * 100)}%`),
+              assetsRef.current,
             );
             toast.success('Slides saved as PPTX');
           }
@@ -388,7 +395,13 @@ export function Player({ spec, exporting, exportLabel, onExportingChange }: Prop
       </div>
 
       {/* canvas stage */}
-      <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-xl border bg-zinc-100/70 p-2 shadow-inner">
+      <div className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-xl border bg-zinc-100/70 p-2 shadow-inner">
+        {spec.scenes.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
+            <p className="text-[14px] font-medium text-zinc-500">Your video renders here</p>
+            <p className="text-[12px] text-zinc-400">write a scene on the left — or pick a template from the Marketplace</p>
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           width={1280}

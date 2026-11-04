@@ -1,23 +1,26 @@
 'use client';
 
 // Marketplace — buy & sell styles, video templates and videos.
-// Payments are simulated in v1 (everything is local); the flow is real.
+// The premade catalog (60+ styles, 220+ templates) is browsable here;
+// nothing is installed until you choose it. Payments simulated in v1.
 
 import { useMemo, useState } from 'react';
-import { Check, Download, Gem, LayoutTemplate, Search, Store, Tag } from 'lucide-react';
+import { Check, Download, Gem, LayoutTemplate, Search, Store, Tag, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { isOwned, loadMarket, loadOwned, publishItem, purchaseItem, type MarketItem } from '@/lib/scenelang/market';
+import { isCatalogItem, isOwned, loadMarket, loadOwned, publishItem, purchaseItem, type MarketItem } from '@/lib/scenelang/market';
 import { parseStyleKit } from '@/lib/scenelang/stylekit';
 import { cn } from '@/lib/utils';
 import { MiniThumb } from './mini-thumb';
+import type { AssetRef } from '@/lib/scenelang/types';
 
 interface Props {
   onImportStyle: (code: string, name: string) => void;
   onLoadTemplate: (code: string) => void;
+  assets: AssetRef[];
 }
 
 function StyleSwatches({ code }: { code: string }) {
@@ -54,19 +57,23 @@ function KindBadge({ kind }: { kind: MarketItem['kind'] }) {
   );
 }
 
-export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
-  const [items, setItems] = useState<MarketItem[]>(() => loadMarket());
+const PAGE = 24;
+
+export function Marketplace({ onImportStyle, onLoadTemplate, assets }: Props) {
+  const [items] = useState<MarketItem[]>(() => loadMarket());
   const [owned, setOwned] = useState<string[]>(() => loadOwned());
   const [filter, setFilter] = useState<'all' | 'style' | 'template' | 'video'>('all');
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<MarketItem | null>(null);
+  const [shownCount, setShownCount] = useState(PAGE);
 
-  const shown = items.filter(
+  const matched = items.filter(
     (i) =>
       (filter === 'all' || i.kind === filter) &&
       (query.trim() === '' ||
         `${i.title} ${i.description} ${i.author}`.toLowerCase().includes(query.toLowerCase())),
   );
+  const shown = matched.slice(0, shownCount);
 
   const buy = (item: MarketItem) => {
     const next = purchaseItem(item.id);
@@ -100,25 +107,34 @@ export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
           <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShownCount(PAGE);
+            }}
             placeholder="Search the marketplace…"
             className="rounded-full pl-9"
           />
         </div>
         <div className="flex rounded-full border bg-white p-1 shadow-sm">
-          {(['all', 'style', 'template', 'video'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={cn(
-                'rounded-full px-3.5 py-1.5 text-[12.5px] font-medium capitalize transition-all',
-                filter === f ? 'bg-violet-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-800',
-              )}
-            >
-              {f === 'all' ? 'everything' : `${f}s`}
-            </button>
-          ))}
+          {(['all', 'style', 'template', 'video'] as const).map((f) => {
+            const count = f === 'all' ? items.length : items.filter((i) => i.kind === f).length;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  setFilter(f);
+                  setShownCount(PAGE);
+                }}
+                className={cn(
+                  'rounded-full px-3.5 py-1.5 text-[12.5px] font-medium capitalize transition-all',
+                  filter === f ? 'bg-violet-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-800',
+                )}
+              >
+                {f === 'all' ? 'everything' : `${f}s`} · {count}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -136,17 +152,21 @@ export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
                   <StyleSwatches code={item.code} />
                 </div>
               ) : (
-                <MiniThumb code={item.code} className="h-full w-full object-cover" />
+                <MiniThumb code={item.code} assets={assets} />
               )}
             </div>
             <div className="p-4">
               <div className="flex items-center gap-2">
                 <KindBadge kind={item.kind} />
-                {item.official && (
+                {isCatalogItem(item.id) ? (
+                  <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10.5px] font-semibold text-violet-700">
+                    <Sparkles className="h-2.5 w-2.5" /> premade
+                  </span>
+                ) : item.official ? (
                   <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10.5px] font-semibold text-violet-700">
                     official
                   </span>
-                )}
+                ) : null}
                 <span className="ml-auto flex items-center gap-0.5 text-[13px] font-semibold text-zinc-800">
                   <Tag className="h-3 w-3 text-zinc-400" />
                   {item.price === 0 ? 'Free' : `$${item.price}`}
@@ -160,10 +180,22 @@ export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
         ))}
         {shown.length === 0 && (
           <p className="col-span-full rounded-3xl border border-dashed bg-white/60 px-4 py-10 text-center text-[13.5px] text-zinc-400">
-            Nothing here yet — publish something from the Studio!
+            Nothing matches — try another search, or publish something from the Studio!
           </p>
         )}
       </div>
+
+      {shownCount < matched.length && (
+        <div className="mt-6 flex justify-center">
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={() => setShownCount((n) => n + PAGE)}
+          >
+            Load more ({matched.length - shownCount} left)
+          </Button>
+        </div>
+      )}
 
       {/* detail dialog */}
       <Dialog open={detail !== null} onOpenChange={(open) => !open && setDetail(null)}>
@@ -182,7 +214,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate }: Props) {
                     <StyleSwatches code={detail.code} />
                   </div>
                 ) : (
-                  <MiniThumb code={detail.code} className="h-full w-full object-cover" />
+                  <MiniThumb code={detail.code} assets={assets} />
                 )}
               </div>
               <p className="text-[13.5px] leading-relaxed text-zinc-600">{detail.description}</p>

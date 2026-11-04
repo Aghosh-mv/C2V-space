@@ -1,5 +1,9 @@
 // Marketplace — styles, video templates and videos that creators can
 // publish, price, buy (simulated) and import straight into the Studio.
+// The premade catalog (60+ styles, 220+ templates) is browsable here;
+// nothing from it is installed unless you choose it.
+
+import { CATALOG_STYLES, CATALOG_TEMPLATES } from './catalog';
 
 export interface MarketItem {
   id: string;
@@ -18,209 +22,37 @@ const ITEMS_KEY = 'scenelang.market.items';
 const OWNED_KEY = 'scenelang.market.owned';
 const STYLES_KEY = 'scenelang.market.styles';
 
-/* ------------------------- seed the marketplace ------------------------ */
+let catalogCache: MarketItem[] | null = null;
 
-const SEEDS: MarketItem[] = [
-  {
-    id: 'style-aurora',
-    kind: 'style',
-    title: 'Aurora',
-    author: 'SceneLang',
-    price: 0,
-    description: 'The signature look — soft light, breathing gradients, glassy calm. Premium PPT energy.',
-    official: true,
-    createdAt: 0,
-    code: `style aurora
-base aurora
-bg #fafafc -> #edeaf7
-ink #16161d
-accents #16161d, #7c6cf0, #2bb59a, #f2925c
-font sans
-tracking 1
-vignette 0.08
-orbs 7`,
-  },
-  {
-    id: 'style-swiss',
-    kind: 'style',
-    title: 'Swiss',
-    author: 'SceneLang',
-    price: 0,
-    description: 'Grid, ink, one red accent. If a poster and a spreadsheet had a very tidy child.',
-    official: true,
-    createdAt: 0,
-    code: `style swiss
-base swiss
-bg #ffffff -> #efefeb
-ink #111111
-accents #111111, #e63946, #8d8d86
-font sans
-tracking 0
-vignette 0
-orbs 0`,
-  },
-  {
-    id: 'style-midnight-lux',
-    kind: 'style',
-    title: 'Midnight Lux',
-    author: 'velvet',
-    price: 3,
-    description: 'Deep navy silk with lavender and mint accents. Smooth enough for a keynote, rich enough for an ad.',
-    createdAt: 1,
-    code: `style midnight-lux
-base aurora
-bg #0e0e16 -> #1a1a2e
-ink #f5f3ff
-dim rgba(245, 243, 255, 0.66)
-accents #c4b5fd, #7dd3c8, #f7c59f, #ffffff
-font sans
-tracking 1.5
-vignette 0.25
-orbs 9`,
-  },
-  {
-    id: 'style-sandstone',
-    kind: 'style',
-    title: 'Sandstone',
-    author: 'clay.co',
-    price: 0,
-    description: 'Warm beige and terracotta. Calm, earthy, Sunday-morning presentation vibes.',
-    createdAt: 2,
-    code: `style sandstone
-base aurora
-bg #faf6f0 -> #f3e7d8
-ink #3d2f23
-accents #b5654a, #8a9a5b, #3d2f23, #d9b08c
-font serif
-tracking 0.5
-vignette 0.1
-orbs 4`,
-  },
-  {
-    id: 'style-orchid',
-    kind: 'style',
-    title: 'Orchid',
-    author: 'petal',
-    price: 2,
-    description: 'Blush pink to lilac, soft serif type. For lookbooks, weddings and gentle launches.',
-    createdAt: 3,
-    code: `style orchid
-base aurora
-bg #fdf7fa -> #f2e8f7
-ink #40243a
-accents #b76e9b, #7c6cf0, #40243a, #e8b4d8
-font serif
-tracking 1
-vignette 0.09
-orbs 6`,
-  },
-  {
-    id: 'style-matcha',
-    kind: 'style',
-    title: 'Matcha',
-    author: 'leafstudio',
-    price: 0,
-    description: 'Green tea calm — mist greens, cream paper, quiet confidence.',
-    createdAt: 4,
-    code: `style matcha
-base aurora
-bg #f7faf5 -> #e8f1e4
-ink #1f3325
-accents #4a7c59, #a3c9a8, #1f3325, #d4a373
-font sans
-tracking 0.5
-vignette 0.08
-orbs 5`,
-  },
-  {
-    id: 'style-noir-gold',
-    kind: 'style',
-    title: 'Noir & Gold',
-    author: 'velvet',
-    price: 4,
-    description: 'Charcoal black with champagne gold. Luxury product ads live here.',
-    createdAt: 5,
-    code: `style noir-gold
-base aurora
-bg #101012 -> #1d1c1a
-ink #f6f1e7
-dim rgba(246, 241, 231, 0.65)
-accents #d4af37, #f6f1e7, #9c8244, #ffffff
-font serif
-tracking 2
-vignette 0.3
-orbs 8`,
-  },
-  {
-    id: 'tpl-product-ad',
-    kind: 'template',
-    title: 'Product ad — 30s spot',
-    author: 'SceneLang',
-    price: 0,
-    description: 'Hook, features, social proof, CTA. Swap the words and ship your ad.',
-    official: true,
-    createdAt: 6,
-    code: `video 1280x720 30fps
-theme aurora
-
-scene hook (4s) fade
-  title "Meet Halo." kinetic
-  subtitle "water that thinks ahead" typewriter
-
-scene features (5s) slide-left
-  title "Smart. Cold. Forever." kinetic
-  bars {Insulation:96, Weight:78, Sync:85} grow
-
-scene cta (4s) zoom-in
-  title "Preorder today." kinetic
-  subtitle "halo.example.com" typewriter`,
-  },
-  {
-    id: 'tpl-pitch-deck',
-    kind: 'template',
-    title: 'Investor pitch — Swiss',
-    author: 'SceneLang',
-    price: 5,
-    description: 'Five scenes of clean investor storytelling with animated market bars.',
-    official: true,
-    createdAt: 7,
-    code: `video 1280x720 30fps
-theme swiss
-
-scene cover (3.5s) fade
-  title "Northwind" pop
-  subtitle "logistics, minus the chaos" fade-up
-
-scene market (4.5s) slide-left
-  bars {2023:14, 2024:22, 2025:31, 2026:45} grow
-
-scene ask (4s) zoom-in
-  title "Raising $2M seed." kinetic
-  text "60% engineering · 25% growth · 15% ops" fade`,
-  },
-  {
-    id: 'tpl-day-ad',
-    kind: 'template',
-    title: 'Ambient day-long ad loop',
-    author: 'clay.co',
-    price: 8,
-    description: 'A slow rotating billboard loop — designed to be stretched across hours. Duplicate scenes to fill a whole day.',
-    createdAt: 8,
-    code: `// A day-long ambient ad — duplicate blocks to fill hours.
-video 1280x720 30fps
-theme midnight-lux
-
-scene block-1 (600s) fade
-  title "Your brand, all day." kinetic
-  bg solid #0e0e16
-  shape ring
-
-scene block-2 (600s) fade
-  title "Quiet. Premium. Present." kinetic
-  bg solid #1a1a2e
-  shape circle`,
-  },
-];
+/** The premade catalog as market items — created fresh, never installed by default. */
+export function catalogItems(): MarketItem[] {
+  if (catalogCache) return catalogCache;
+  catalogCache = [
+    ...CATALOG_STYLES.map((s, i): MarketItem => ({
+      id: s.id,
+      kind: 'style',
+      title: s.title,
+      author: s.author,
+      price: s.price,
+      description: s.description,
+      code: s.code,
+      official: true,
+      createdAt: -(10_000 - i), // catalog first, oldest first for stable order
+    })),
+    ...CATALOG_TEMPLATES.map((t, i): MarketItem => ({
+      id: t.id,
+      kind: 'template',
+      title: t.title,
+      author: t.author,
+      price: t.price,
+      description: t.description,
+      code: t.code,
+      official: true,
+      createdAt: -(100_000 - i),
+    })),
+  ];
+  return catalogCache;
+}
 
 /* ------------------------------ storage -------------------------------- */
 
@@ -242,10 +74,10 @@ function write(key: string, value: unknown) {
   }
 }
 
+/** Everything listed in the marketplace: your items + the full catalog. */
 export function loadMarket(): MarketItem[] {
   const stored = read<MarketItem[]>(ITEMS_KEY, []);
-  const ids = new Set(stored.map((i) => i.id));
-  return [...SEEDS.filter((s) => !ids.has(s.id)), ...stored].sort((a, b) => a.createdAt - b.createdAt);
+  return [...catalogItems(), ...stored].sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export function publishItem(item: Omit<MarketItem, 'id' | 'createdAt'>): MarketItem {
@@ -254,9 +86,13 @@ export function publishItem(item: Omit<MarketItem, 'id' | 'createdAt'>): MarketI
     id: `user-${Date.now()}`,
     createdAt: Date.now(),
   };
-  const all = loadMarket();
-  write(ITEMS_KEY, [...all.filter((i) => !i.official), full]);
+  const all = read<MarketItem[]>(ITEMS_KEY, []);
+  write(ITEMS_KEY, [...all, full]);
   return full;
+}
+
+export function isCatalogItem(id: string): boolean {
+  return id.startsWith('cat-');
 }
 
 export function loadOwned(): string[] {

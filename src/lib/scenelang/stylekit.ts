@@ -1,9 +1,20 @@
 // StyleKit — the second SceneLang language.
-// A style is a look: colors, ink, fonts, motion feel. Write it, publish it to
-// the Marketplace, and anyone can `import <name>` and use it as their theme.
+// A style declares its own look from scratch: there is NO default base to
+// inherit — you say what you want, line by line. Write it, publish it to the
+// Marketplace, and anyone can `import <name>` and use it as their theme.
+//
+//   style midnight-lux
+//   bg #0e0e16 -> #1a1a2e
+//   ink #f5f3ff
+//   dim rgba(245, 243, 255, 0.66)
+//   accents #c4b5fd, #7dd3c8, #f7c59f
+//   font sans
+//   tracking 1.5
+//   vignette 0.25
+//   orbs 9
 
 import type { ParseError } from './types';
-import { registerStyle, THEME_DEFAULTS, type ThemeTokens } from './themes';
+import { registerStyle, type ThemeTokens } from './themes';
 
 const HEX = /^#[0-9a-fA-F]{3,8}$/;
 const CSS_COLOR = /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|[a-z]+)$/i;
@@ -35,27 +46,14 @@ function withAlpha(color: string, alpha: number): string {
   return color;
 }
 
-/**
- * Parse StyleKit source. Example:
- *
- *   style midnight-lux
- *     bg #0e0e16 -> #1a1a2e
- *     ink #f5f3ff
- *     dim rgba(245,243,255,0.65)
- *     accents #c4b5fd, #7dd3c8, #f7c59f
- *     font sans
- *     tracking 1
- *     glow off
- *     vignette 0.15
- *     orbs 6
- */
 export function parseStyleKit(source: string): StyleParseResult {
   const errors: ParseError[] = [];
   const lines = source.split('\n');
   let name: string | null = null;
-  let themeName = 'aurora'; // base to inherit from
 
   const acc: Partial<ThemeTokens> = {};
+  let sawBg = false;
+  let sawInk = false;
 
   lines.forEach((rawLine, i) => {
     const line = i + 1;
@@ -68,9 +66,12 @@ export function parseStyleKit(source: string): StyleParseResult {
       return;
     }
 
-    const baseMatch = text.match(/^base\s+([\w-]+)$/);
-    if (baseMatch) {
-      themeName = baseMatch[1];
+    // `base` is gone — a style stands on its own
+    if (/^base\s+/.test(text)) {
+      errors.push({
+        line,
+        message: 'styles have no default base anymore — declare what you need: bg, ink, accents, font…',
+      });
       return;
     }
 
@@ -88,16 +89,20 @@ export function parseStyleKit(source: string): StyleParseResult {
         const parts = value.split('->').map((s) => s.trim());
         if (parts.length >= 2 && parts.every((c) => CSS_COLOR.test(c))) {
           acc.bg = [parts[0], parts[1]];
+          sawBg = true;
         } else if (parts.length === 1 && CSS_COLOR.test(parts[0])) {
           acc.bg = [parts[0], parts[0]];
+          sawBg = true;
         } else {
           errors.push({ line, message: 'bg needs two colors:  bg #fafafc -> #edeaf7' });
         }
         break;
       }
       case 'ink':
-        if (CSS_COLOR.test(value)) acc.text = value;
-        else errors.push({ line, message: 'ink needs a color, e.g.  ink #16161d' });
+        if (CSS_COLOR.test(value)) {
+          acc.text = value;
+          sawInk = true;
+        } else errors.push({ line, message: 'ink needs a color, e.g.  ink #16161d' });
         break;
       case 'dim':
         if (CSS_COLOR.test(value)) acc.dim = value;
@@ -144,23 +149,30 @@ export function parseStyleKit(source: string): StyleParseResult {
     return { name: null, tokens: null, errors };
   }
 
-  const base = THEME_DEFAULTS[themeName] ?? THEME_DEFAULTS.aurora;
+  // no base — a style must declare its own bg and ink
+  if (!sawBg) {
+    errors.push({ line: 0, message: 'styles have no base — declare the background:  bg #fafafc -> #edeaf7' });
+  }
+  if (!sawInk) {
+    errors.push({ line: 0, message: 'styles have no base — declare the text color:  ink #16161d' });
+  }
+
+  const ink = acc.text ?? '#16161d';
   const tokens: ThemeTokens = {
-    ...base,
     name,
     label: name,
     titleBar: false,
     scanlines: false,
-    bg: acc.bg ?? base.bg,
-    text: acc.text ?? base.text,
-    dim: acc.dim ?? withAlpha(acc.text ?? base.text, 0.62),
-    palette: acc.palette ?? base.palette,
-    font: acc.font ?? base.font,
-    letterSpacing: acc.letterSpacing ?? base.letterSpacing,
+    bg: acc.bg ?? ['#fafafa', '#efefef'],
+    text: ink,
+    dim: acc.dim ?? withAlpha(ink, 0.62),
+    palette: acc.palette ?? [ink],
+    font: acc.font ?? FONT_STACKS.sans,
+    letterSpacing: acc.letterSpacing ?? '0px',
     glow: acc.glow ?? false,
-    particles: acc.particles ?? (acc.glow ? 0 : 7),
-    vignette: acc.vignette ?? (acc.glow ? 'rgba(15,14,24,0.35)' : 'rgba(15, 14, 24, 0.08)'),
-    gridLine: withAlpha(acc.text ?? base.text, 0.08),
+    particles: acc.particles ?? 0,
+    vignette: acc.vignette ?? 'none',
+    gridLine: withAlpha(ink, 0.08),
   };
 
   // make it available to the renderer right away
