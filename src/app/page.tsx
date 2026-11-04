@@ -313,9 +313,9 @@ export default function Page() {
             {(
               [
                 ['studio', 'Studio', PlayCircle],
+                ['history', 'History', History],
                 ['learn', 'Learner', BookOpen],
                 ['market', 'Marketplace', Store],
-                ['history', 'History', History],
               ] as const
             ).map(([v, label, Icon]) => (
               <button
