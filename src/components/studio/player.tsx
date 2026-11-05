@@ -40,6 +40,13 @@ import { Timeline } from './timeline';
 type Mode = 'anim' | 'slides';
 type ExportKind = 'webm' | 'mp4' | 'pdf' | 'pptx';
 
+/** dated filename so exports never collide in the Downloads folder */
+const exportStamp = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+};
+
 interface Props {
   spec: VideoSpec;
   exporting: boolean;
@@ -115,8 +122,12 @@ export function Player({ spec, exporting, exportLabel, assets, onExportingChange
           const scene = s.scenes[idx];
           time = scene.startMs + sceneSettleMs(scene);
         }
-        canvas.width = s.width;
-        canvas.height = s.height;
+        // only resize the surface when the code changes it — reassigning every frame
+        // resets the canvas and wastes work at 60fps
+        if (canvas.width !== s.width || canvas.height !== s.height) {
+          canvas.width = s.width;
+          canvas.height = s.height;
+        }
         renderFrame(ctx as Ctx, s, time, toAssetMap(assetsRef.current));
       }
       raf = requestAnimationFrame(tick);
@@ -181,7 +192,7 @@ export function Player({ spec, exporting, exportLabel, assets, onExportingChange
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) return;
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'SELECT' || el.tagName === 'A' || el.isContentEditable)) return;
       if (exportingRef.current) return;
       if (e.code === 'Space') {
         e.preventDefault();
@@ -247,7 +258,7 @@ export function Player({ spec, exporting, exportLabel, assets, onExportingChange
           onExportingChange(true, 'Capturing preview (real-time)…');
           const webm = await recordWebM();
           if (!webm) return;
-          downloadBlob(webm, 'scenelang-capture.webm');
+          downloadBlob(webm, `c2v-capture-${exportStamp()}.webm`);
           toast.success('Preview captured as WebM');
         } else if (kind === 'mp4') {
           onExportingChange(true, 'Compiling your video from code…');
@@ -259,7 +270,7 @@ export function Player({ spec, exporting, exportLabel, assets, onExportingChange
               () => cancelRef.current,
               assetsRef.current,
             );
-            downloadBlob(mp4, 'scenelang-video.mp4');
+            downloadBlob(mp4, `c2v-video-${exportStamp()}.mp4`);
             toast.success('Video compiled to MP4 — made entirely from your code');
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -270,7 +281,7 @@ export function Player({ spec, exporting, exportLabel, assets, onExportingChange
               onExportingChange(true, 'Capturing preview (real-time)…');
               const webm = await recordWebM();
               if (webm) {
-                downloadBlob(webm, 'scenelang-capture.webm');
+                downloadBlob(webm, `c2v-capture-${exportStamp()}.webm`);
                 toast.success('Saved as WebM (browser cannot compile MP4)');
               }
             }

@@ -287,6 +287,10 @@ export function PublishDialog({ open, onOpenChange, kind, code, defaultTitle, on
       toast.error('Give your listing a name first.');
       return;
     }
+    if (!code.trim()) {
+      toast.error('This listing has no code yet — write it first.');
+      return;
+    }
     publishItem({
       kind,
       title: title.trim(),

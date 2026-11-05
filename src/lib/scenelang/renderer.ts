@@ -44,20 +44,21 @@ const imageCache = new Map<string, ImgEntry>();
 function getImage(src: string): ImgEntry {
   let entry = imageCache.get(src);
   if (!entry) {
-    entry = { img: null, ready: false };
-    imageCache.set(src, entry);
+    const fresh: { img: HTMLImageElement | null; ready: boolean } = { img: null, ready: false };
+    imageCache.set(src, fresh);
+    entry = fresh;
     if (/^(https?:\/\/|\/|data:)/.test(src)) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        entry.ready = true;
+        fresh.ready = true;
       };
       img.onerror = () => {
-        entry.ready = false;
-        entry.img = null;
+        fresh.ready = false;
+        fresh.img = null;
       };
       img.src = src;
-      entry.img = img;
+      fresh.img = img;
     }
   }
   return entry;
@@ -984,8 +985,6 @@ function drawSceneElements(
         break;
       case 'shape':
         drawShape(ctx, spec, T, el, elT, absT, baseDelay);
-        break;
-      case 'bg':
         break;
     }
     i++;

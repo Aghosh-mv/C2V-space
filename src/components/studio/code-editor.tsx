@@ -120,6 +120,44 @@ export function CodeEditor({ code, onChange, errors, readOnly, language = 'scene
     });
   };
 
+  // real code-editor keys: Tab / Shift+Tab indent & outdent, Enter keeps the indent
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (readOnly || e.metaKey || e.ctrlKey || e.altKey) return;
+    const ta = e.currentTarget;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
+      if (e.shiftKey) {
+        const cut = ta.value.slice(lineStart, lineStart + 2) === '  ' ? 2 : ta.value.startsWith(' ', lineStart) ? 1 : 0;
+        if (cut === 0) return;
+        onChange(ta.value.slice(0, lineStart) + ta.value.slice(lineStart + cut));
+        requestAnimationFrame(() => ta.setSelectionRange(Math.max(lineStart, start - cut), Math.max(lineStart, end - cut)));
+      } else {
+        onChange(ta.value.slice(0, start) + '  ' + ta.value.slice(end));
+        requestAnimationFrame(() => ta.setSelectionRange(start + 2, start + 2));
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = ta.value.slice(lineStart, start);
+      const ws = (currentLine.match(/^\s*/) ?? [''])[0];
+      // an element/transition line means the next lines are its actions — go one level deeper
+      const deeper = /^(title|subtitle|text|bars|pie|image|sprite|lines|shape|bg|transition)\b/.test(currentLine.trim())
+        ? '  '
+        : '';
+      const insert = '\n' + ws + deeper;
+      onChange(ta.value.slice(0, start) + insert + ta.value.slice(end));
+      const caret = start + insert.length;
+      requestAnimationFrame(() => ta.setSelectionRange(caret, caret));
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* snippet chips */}
@@ -180,6 +218,7 @@ export function CodeEditor({ code, onChange, errors, readOnly, language = 'scene
             readOnly={readOnly}
             spellCheck={false}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
             onScroll={syncScroll}
             onFocus={() => {
               focusedRef.current = true;

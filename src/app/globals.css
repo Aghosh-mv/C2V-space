@@ -159,3 +159,22 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: 0 1px 6px oklch(0.4 0.1 295 / 0.35);
   cursor: pointer;
 }
+
+/* respect users who ask for less motion — UI chrome only; the video canvas is the product */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* always show a clear focus ring when tabbing — never removed, only styled */
+:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

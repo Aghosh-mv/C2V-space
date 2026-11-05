@@ -7,6 +7,12 @@ import type { AssetRef } from './types';
 
 const KEY = 'scenelang.assets';
 const MAX_PERSIST_BYTES = 1_400_000; // keep localStorage friendly; larger files live for the session
+const MAX_INPUT_BYTES = 25_000_000; // refuse absurd files instead of freezing the tab
+
+/** true when the asset will survive a page reload (kept inside localStorage limits). */
+export function persistsAcrossReload(asset: AssetRef): boolean {
+  return (asset.dataUrl?.length ?? asset.content?.length ?? 0) <= MAX_PERSIST_BYTES;
+}
 
 export function loadAssets(): AssetRef[] {
   if (typeof window === 'undefined') return [];
@@ -47,6 +53,10 @@ export function assetMap(assets: AssetRef[]): Map<string, AssetRef> {
 
 export function readFileAsAsset(file: File): Promise<AssetRef> {
   return new Promise((resolve, reject) => {
+    if (file.size > MAX_INPUT_BYTES) {
+      reject(new Error(`${file.name} is ${(file.size / 1_000_000).toFixed(0)} MB — keep imported files under 25 MB`));
+      return;
+    }
     const lower = file.name.toLowerCase();
     const kind: AssetRef['kind'] = lower.endsWith('.csv') || lower.endsWith('.tsv')
       ? 'csv'

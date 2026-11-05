@@ -31,11 +31,11 @@ import { parseSceneLang } from '@/lib/scenelang/parser';
 import { parseStyleKit } from '@/lib/scenelang/stylekit';
 import { addImportToCode, setThemeInCode } from '@/lib/scenelang/themes';
 import { loadInstalledStyles, saveInstalledStyle } from '@/lib/scenelang/market';
-import { loadAssets, readFileAsAsset, removeAsset, saveAsset } from '@/lib/scenelang/assets';
+import { loadAssets, persistsAcrossReload, readFileAsAsset, removeAsset, saveAsset } from '@/lib/scenelang/assets';
 import { getSession, listSessions, saveSession, type CodeSession } from '@/lib/scenelang/history';
 import { SAMPLES } from '@/lib/scenelang/samples';
 import { formatDuration } from '@/lib/scenelang/parser';
-import type { AssetRef, ParseError } from '@/lib/scenelang/types';
+import type { AssetRef, ParseError, VideoSpec } from '@/lib/scenelang/types';
 import { cn } from '@/lib/utils';
 
 type View = 'studio' | 'learn' | 'market' | 'history';
@@ -203,12 +203,14 @@ export default function Page() {
 
   /* --------------------------- scene pipeline --------------------------- */
 
-  const { spec, errors } = useMemo(() => {
+  const EMPTY_SPEC: VideoSpec = { width: 1280, height: 720, fps: 30, theme: 'plain', scenes: [], totalMs: 0 };
+  const { spec: parsedSpec, errors } = useMemo(() => {
     const result = parseSceneLang(debouncedScene, installedStyles, assetNames);
     const all: ParseError[] = [...result.errors];
     if (importError) all.push({ line: 0, message: importError });
     return { spec: result.spec, errors: all };
   }, [debouncedScene, installedStyles, assetNames, importError]);
+  const spec = parsedSpec ?? EMPTY_SPEC;
 
   /* ------------------------------ assets -------------------------------- */
 
@@ -230,6 +232,9 @@ export default function Page() {
           const asset = await readFileAsAsset(file);
           saveAsset(asset);
           setAssets(loadAssets());
+          if (!persistsAcrossReload(asset)) {
+            toast.info(`${asset.name} is large — it works now but only lasts this session (a reload clears it)`);
+          }
           const hint =
             asset.kind === 'image'
               ? 'use it with:  image ' + asset.name
@@ -308,6 +313,16 @@ export default function Page() {
     setExportLabel(label);
   };
 
+  const openPublish = (kind: 'style' | 'template' | 'video') => {
+    const code = kind === 'style' ? styleCode : sceneCode;
+    if (!code.trim()) {
+      toast.error(kind === 'style' ? 'Write your style first — then sell it.' : 'Write some code first — then sell it.');
+      return;
+    }
+    setPublishKind(kind);
+    setPublishOpen(true);
+  };
+
   const activeCode = editorTab === 'scene' ? sceneCode : styleCode;
 
   const compilerChip =
@@ -349,6 +364,7 @@ export default function Page() {
               <button
                 key={v}
                 type="button"
+                aria-label={label}
                 onClick={() => setView(v)}
                 className={cn(
                   'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition-all',
@@ -448,10 +464,7 @@ export default function Page() {
                         size="sm"
                         variant="outline"
                         className="gap-1.5 rounded-full"
-                        onClick={() => {
-                          setPublishKind('template');
-                          setPublishOpen(true);
-                        }}
+                        onClick={() => openPublish('template')}
                       >
                         <UploadCloud className="h-3.5 w-3.5" /> Sell
                       </Button>
@@ -465,10 +478,7 @@ export default function Page() {
                         size="sm"
                         variant="outline"
                         className="gap-1.5 rounded-full"
-                        onClick={() => {
-                          setPublishKind('style');
-                          setPublishOpen(true);
-                        }}
+                        onClick={() => openPublish('style')}
                       >
                         <UploadCloud className="h-3.5 w-3.5" /> Sell
                       </Button>
@@ -557,7 +567,7 @@ export default function Page() {
                 </div>
               )}
 
-              <p className="border-t bg-zinc-50/70 px-4 py-2 text-[11.5px] text-zinc-400">
+              <p className="border-t bg-zinc-50/70 px-4 py-2 text-[11.5px] text-zinc-500">
                 {editorTab === 'scene'
                   ? 'SceneLang v2 — every action on its own line. Space plays, ↑↓ flip slides, snapshots auto-save to History (inimportcode :id pulls them back).'
                   : 'StyleKit — no default base: declare bg and ink, then shape the feel. Apply to paint your video, or Sell to list it.'}
@@ -590,7 +600,7 @@ export default function Page() {
       </main>
 
       <footer className="mt-auto border-t bg-white/70 py-4">
-        <p className="text-center text-[12px] text-zinc-400">
+        <p className="text-center text-[12px] text-zinc-500">
           SceneLang Studio — free, global, premium. You write the code, the compiler films it.
         </p>
       </footer>

@@ -72,7 +72,7 @@ export async function exportPdf(spec: VideoSpec, onProgress: (p: number) => void
     onProgress((i + 1) / spec.scenes.length);
     await sleep(24);
   }
-  pdf.save('scenelang-slides.pdf');
+  pdf.save(`c2v-slides-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 /* ------------------------------- PPTX -------------------------------- */
@@ -92,7 +92,7 @@ export async function exportPptx(spec: VideoSpec, onProgress: (p: number) => voi
     onProgress((i + 1) / spec.scenes.length);
     await sleep(24);
   }
-  await pptx.writeFile({ fileName: 'scenelang-slides.pptx' });
+  await pptx.writeFile({ fileName: `c2v-slides-${new Date().toISOString().slice(0, 10)}.pptx` });
 }
 
 /* --------------------------- MP4 compiler ---------------------------- */
@@ -131,8 +131,9 @@ export async function compileVideoToMp4(
   const support = await VideoEncoder.isConfigSupported(config);
   if (!support.supported) throw new Error('encoder config unsupported');
 
+  const target = new ArrayBufferTarget();
   const muxer = new Muxer({
-    target: new ArrayBufferTarget(),
+    target,
     video: { codec: 'avc', width, height },
     fastStart: 'in-memory',
   });
@@ -185,7 +186,7 @@ export async function compileVideoToMp4(
   await encoder.flush();
   encoder.close();
   muxer.finalize();
-  const buffer = (muxer.target as ArrayBufferTarget).buffer;
+  const buffer = target.buffer;
   return new Blob([buffer], { type: 'video/mp4' });
 }
 
