@@ -63,3 +63,7 @@ examples/
 skills/
 upload/
 agent-ctx/
+
+# local database (prisma/sqlite)
+*.db
+db/*.db

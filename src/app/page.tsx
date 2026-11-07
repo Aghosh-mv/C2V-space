@@ -32,7 +32,8 @@ import { parseStyleKit } from '@/lib/scenelang/stylekit';
 import { addImportToCode, setThemeInCode } from '@/lib/scenelang/themes';
 import { loadInstalledStyles, saveInstalledStyle } from '@/lib/scenelang/market';
 import { loadAssets, persistsAcrossReload, readFileAsAsset, removeAsset, saveAsset } from '@/lib/scenelang/assets';
-import { getSession, listSessions, saveSession, type CodeSession } from '@/lib/scenelang/history';
+import { deleteSession, getSession, listSessions, pullSessionsFromServer, saveSession, type CodeSession } from '@/lib/scenelang/history';
+import { apiFetch, getClientId } from '@/lib/client/api';
 import { SAMPLES } from '@/lib/scenelang/samples';
 import { formatDuration } from '@/lib/scenelang/parser';
 import type { AssetRef, ParseError, VideoSpec } from '@/lib/scenelang/types';
@@ -95,6 +96,21 @@ export default function Page() {
 
   /* ------------------------- load & persist code ------------------------ */
 
+  // Durable cloud mirror of the editors — PUT /api/sync, debounced by the
+  // same 320ms that gates the local writes. Fire-and-forget: the local copy
+  // is always the instant source of truth, the server is the second copy.
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSync = useRef<{ sceneCode?: string; styleCode?: string }>({});
+  const mirrorSync = (field: 'sceneCode' | 'styleCode', code: string) => {
+    pendingSync.current[field] = code;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      const payload = { clientId: getClientId(), ...pendingSync.current };
+      pendingSync.current = {};
+      void apiFetch('/api/sync', { method: 'PUT', body: JSON.stringify(payload) });
+    }, 1500);
+  };
+
   useEffect(() => {
     const id = setTimeout(() => {
       // re-register installed marketplace styles so `import` / theme lines resolve after a reload
@@ -114,6 +130,31 @@ export default function Page() {
         setStyleCode(st);
         setDebouncedStyle(st);
       }
+
+      // durable second copy: pull the cloud mirror. Local edits always win,
+      // but when this browser is empty the server restores your work.
+      void (async () => {
+        const clientId = getClientId();
+        const cloud = await apiFetch<{ sceneCode: string | null; styleCode: string | null; sceneSavedAt: number | null; styleSavedAt: number | null }>(
+          `/api/sync?clientId=${encodeURIComponent(clientId)}`,
+        );
+        if (cloud.ok) {
+          const haveScene = (window.localStorage.getItem(SCENE_KEY) ?? '').trim() !== '';
+          const haveStyle = (window.localStorage.getItem(STYLE_KEY) ?? '').trim() !== '';
+          if (!haveScene && cloud.data.sceneCode && cloud.data.sceneCode.trim()) {
+            setSceneCode(cloud.data.sceneCode);
+            setDebouncedScene(cloud.data.sceneCode);
+            toast.success('Restored your SceneLang code from your cloud copy');
+          }
+          if (!haveStyle && cloud.data.styleCode && cloud.data.styleCode.trim()) {
+            setStyleCode(cloud.data.styleCode);
+            setDebouncedStyle(cloud.data.styleCode);
+            toast.success('Restored your StyleKit code from your cloud copy');
+          }
+        }
+        const merged = await pullSessionsFromServer();
+        if (merged) setSessions(merged);
+      })();
     }, 0);
     return () => clearTimeout(id);
   }, []);
@@ -140,6 +181,7 @@ export default function Page() {
         setImportError(null);
         setDebouncedScene(sceneCode);
         window.localStorage.setItem(SCENE_KEY, sceneCode);
+        mirrorSync('sceneCode', sceneCode);
       }
     }, 320);
     return () => clearTimeout(id);
@@ -166,6 +208,7 @@ export default function Page() {
         setImportError(null);
         setDebouncedStyle(styleCode);
         window.localStorage.setItem(STYLE_KEY, styleCode);
+        mirrorSync('styleCode', styleCode);
         const result = parseStyleKit(styleCode);
         if (result.name && result.tokens) {
           saveInstalledStyle({ name: result.name, code: styleCode });
@@ -340,6 +383,12 @@ export default function Page() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f6fa]">
+      <a
+        href="#studio-main"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-violet-600 focus:px-4 focus:py-2 focus:text-[13px] focus:text-white"
+      >
+        Skip to the studio
+      </a>
       {/* header */}
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4">
@@ -390,7 +439,7 @@ export default function Page() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col">
+      <main id="studio-main" className="flex flex-1 flex-col">
         {view === 'studio' && (
           <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 lg:flex-row">
             {/* editors */}
@@ -487,7 +536,7 @@ export default function Page() {
                 </div>
               </div>
 
-              {activeSceneError && (
+              {editorTab === 'scene' && activeSceneError && (
                 <div className="border-b bg-violet-50 px-4 py-2 text-[12.5px] text-violet-800">
                   {activeSceneError.message}
                 </div>
@@ -535,7 +584,13 @@ export default function Page() {
                 )}
 
                 {editorTab === 'scene' ? (
-                  <CodeEditor code={sceneCode} onChange={setSceneCode} errors={errors} readOnly={exporting} language="scene" />
+                  <CodeEditor
+                    code={sceneCode}
+                    onChange={setSceneCode}
+                    errors={errors.filter((e) => e.line !== 0)}
+                    readOnly={exporting}
+                    language="scene"
+                  />
                 ) : (
                   <CodeEditor code={styleCode} onChange={setStyleCode} errors={styleResult.errors} readOnly={exporting} language="style" />
                 )}
@@ -595,13 +650,20 @@ export default function Page() {
               loadIntoEditor(code, kind);
               toast.success(`Session loaded into the ${kind === 'scene' ? 'SceneLang' : 'StyleKit'} editor`);
             }}
+            onDelete={(id) => {
+              setSessions(deleteSession(id));
+              toast.success('Session deleted — here and on the server');
+            }}
           />
         )}
       </main>
 
       <footer className="mt-auto border-t bg-white/70 py-4">
         <p className="text-center text-[12px] text-zinc-500">
-          SceneLang Studio — free, global, premium. You write the code, the compiler films it.
+          C2V space — free, global, premium. You write the code, the compiler films it.{' '}
+          <a href="/legal" className="underline decoration-zinc-300 underline-offset-2 transition-colors hover:text-zinc-800 hover:decoration-zinc-500">
+            Privacy &amp; terms
+          </a>
         </p>
       </footer>
 

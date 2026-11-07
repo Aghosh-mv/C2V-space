@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { APP_NAME, APP_VERSION } from '@/lib/version';
 
-// Health probe for uptime checks and the PWA.
+// Health probe for uptime checks and monitoring.
 export async function GET() {
   return NextResponse.json(
-    { app: 'c2v-space', status: 'ok', version: '2.1' },
+    { app: APP_NAME, status: 'ok', version: APP_VERSION, time: new Date().toISOString() },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

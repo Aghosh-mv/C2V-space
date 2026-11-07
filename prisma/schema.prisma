@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// C2V space — data model.
+// Anonymous-first: every row hangs off a `clientId` (a random id the browser
+// generates once and keeps). No passwords, no emails, no tracking.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +11,56 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// Cloud mirror of whatever is currently in the two Studio editors.
+/// Lets the same creator recover code after a cleared browser and keeps
+/// localStorage from being the only copy of someone's work.
+model SyncState {
+  clientId      String    @id
+  sceneCode     String    @default("")
+  styleCode     String    @default("")
+  sceneSavedAt  DateTime?
+  styleSavedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
-model Post {
+/// Versioned snapshots of code — the server-side half of the History tab
+/// (`inimportcode :<id>` pulls any of these back into the editor).
+model CodeSession {
+  id       String   @id // s-xxxxxxx, issued by the server
+  clientId String
+  kind     String // 'scene' | 'style'
+  code     String
+  savedAt  DateTime @default(now())
+
+  @@index([clientId, savedAt(sort: Desc)])
+}
+
+/// Everything a creator lists on the Marketplace. The official premade
+/// catalog is bundled with the app and never lives here — this is
+/// community content only, validated server-side before it is accepted.
+model MarketListing {
+  id          String   @id @default(cuid())
+  kind        String // 'style' | 'template' | 'effect' | 'video'
+  title       String
+  author      String
+  description String
+  price       Int      @default(0) // whole USD, 0 = free
+  code        String // StyleKit or SceneLang source
+  clientId    String // who published it
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}
+
+/// Server-recorded entitlement ("this listing is mine"). Replaces the old
+/// simulated localStorage checkout.
+model Entitlement {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  clientId  String
+  listingId String
+  pricePaid Int      @default(0)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, listingId])
 }

@@ -1,17 +1,29 @@
 'use client';
 
 // Marketplace — buy & sell styles, video templates and videos.
-// The premade catalog (60+ styles, 220+ templates) is browsable here;
-// nothing is installed until you choose it. Payments simulated in v1.
+// The premade catalog (60+ styles, 240+ templates) is browsable here;
+// nothing is installed until you choose it. Community listings are
+// published through the server, which validates the code before accepting.
 
-import { useMemo, useState } from 'react';
-import { Check, Download, Gem, LayoutTemplate, Search, Store, Tag, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, CloudDownload, Download, Gem, LayoutTemplate, Loader2, Search, Store, Tag, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { isCatalogItem, isOwned, loadMarket, loadOwned, publishItem, purchaseItem, type MarketItem } from '@/lib/scenelang/market';
+import {
+  fetchServerListings,
+  isCatalogItem,
+  isOwned,
+  loadMarket,
+  loadOwned,
+  type MarketItem,
+  pullOwnedFromServer,
+  publishItem,
+  purchaseItem,
+} from '@/lib/scenelang/market';
+import { loadSavedAuthor, MAX_AUTHOR, MAX_DESCRIPTION, MAX_TITLE, saveAuthor } from '@/lib/scenelang/publish-limits';
 import { parseStyleKit } from '@/lib/scenelang/stylekit';
 import { cn } from '@/lib/utils';
 import { MiniThumb } from './mini-thumb';
@@ -62,12 +74,29 @@ function KindBadge({ kind }: { kind: MarketItem['kind'] }) {
 const PAGE = 24;
 
 export function Marketplace({ onImportStyle, onLoadTemplate, onImportEffect, assets }: Props) {
-  const [items] = useState<MarketItem[]>(() => loadMarket());
+  const [items, setItems] = useState<MarketItem[]>(() => loadMarket());
   const [owned, setOwned] = useState<string[]>(() => loadOwned());
+  const [sync, setSync] = useState<'syncing' | 'live' | 'offline'>('syncing');
   const [filter, setFilter] = useState<'all' | 'style' | 'template' | 'video' | 'effect'>('all');
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<MarketItem | null>(null);
   const [shownCount, setShownCount] = useState(PAGE);
+
+  // pull community listings + durable entitlements from the server;
+  // the local mirror keeps the grid instant and offline-safe
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [listings, ownedFromServer] = await Promise.all([fetchServerListings(), pullOwnedFromServer()]);
+      if (cancelled) return;
+      setSync(listings === null ? 'offline' : 'live');
+      setItems(loadMarket());
+      if (ownedFromServer) setOwned(ownedFromServer);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const matched = items.filter(
     (i) =>
@@ -80,8 +109,7 @@ export function Marketplace({ onImportStyle, onLoadTemplate, onImportEffect, ass
   const buy = (item: MarketItem) => {
     const next = purchaseItem(item.id);
     setOwned([...next]);
-    if (item.price === 0) toast.success(`“${item.title}” added to your library`);
-    else toast.success(`Purchased “${item.title}” for $${item.price} (demo checkout) — it's yours`);
+    toast.success(`“${item.title}” is yours — added to your library`);
   };
 
   const importNow = (item: MarketItem) => {
@@ -104,6 +132,22 @@ export function Marketplace({ onImportStyle, onLoadTemplate, onImportEffect, ass
         <p className="mt-1 text-[13.5px] text-zinc-500">
           A global, premium, free catalog — every premade style, template and effect pack is free. Creators can still price their own work.
         </p>
+      </div>
+
+      <div aria-live="polite" className="mb-3 flex items-center gap-1.5 text-[11.5px] text-zinc-400">
+        {sync === 'syncing' ? (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin" /> syncing with the server…
+          </>
+        ) : sync === 'live' ? (
+          <>
+            <CloudDownload className="h-3 w-3 text-emerald-600" /> live — community listings are synced
+          </>
+        ) : (
+          <>
+            <CloudDownload className="h-3 w-3 text-amber-600" /> offline — showing the last synced copy
+          </>
+        )}
       </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -167,10 +211,10 @@ export function Marketplace({ onImportStyle, onLoadTemplate, onImportEffect, ass
                     <Sparkles className="h-2.5 w-2.5" /> premade
                   </span>
                 ) : item.official ? (
-                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10.5px] font-semibold text-violet-700">
-                    official
-                  </span>
-                ) : null}
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10.5px] font-semibold text-violet-700">official</span>
+                ) : (
+                  <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10.5px] font-semibold text-teal-700">community</span>
+                )}
                 <span className="ml-auto flex items-center gap-0.5 text-[13px] font-semibold text-zinc-800">
                   <Tag className="h-3 w-3 text-zinc-400" />
                   {item.price === 0 ? 'Free' : `$${item.price}`}
@@ -277,29 +321,46 @@ interface PublishProps {
 
 export function PublishDialog({ open, onOpenChange, kind, code, defaultTitle, onPublished }: PublishProps) {
   const [title, setTitle] = useState(defaultTitle ?? '');
+  const [author, setAuthor] = useState(() => loadSavedAuthor());
   const [price, setPrice] = useState('0');
   const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
   // the parent remounts this dialog via `key` when the kind changes,
   // so fields always start fresh
 
-  const publish = () => {
+  const publish = async () => {
     if (!title.trim()) {
       toast.error('Give your listing a name first.');
+      return;
+    }
+    if (!author.trim()) {
+      toast.error('Tell the marketplace who made it — an author name is required.');
       return;
     }
     if (!code.trim()) {
       toast.error('This listing has no code yet — write it first.');
       return;
     }
-    publishItem({
+    setBusy(true);
+    const result = await publishItem({
       kind,
-      title: title.trim(),
-      author: 'you',
-      price: Math.max(0, Math.min(999, Number(price) || 0)),
-      description: description.trim() || (kind === 'style' ? 'A custom StyleKit look.' : 'A SceneLang creation.'),
+      title: title.trim().slice(0, MAX_TITLE),
+      author: author.trim().slice(0, MAX_AUTHOR),
+      price: Math.max(0, Math.min(999, Math.round(Number(price) || 0))),
+      description: description.trim().slice(0, MAX_DESCRIPTION) || (kind === 'style' ? 'A custom StyleKit look.' : 'A SceneLang creation.'),
       code,
     });
-    toast.success(`“${title.trim()}” is live on the Marketplace!`);
+    setBusy(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    saveAuthor(author.trim());
+    if (result.stored === 'server') {
+      toast.success(`“${result.item.title}” is live on the Marketplace — validated and published`);
+    } else {
+      toast.info(`“${result.item.title}” was saved on this device — the server was unreachable, it stays local for now`);
+    }
     onOpenChange(false);
     onPublished?.();
   };
@@ -314,22 +375,74 @@ export function PublishDialog({ open, onOpenChange, kind, code, defaultTitle, on
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-[12.5px] font-medium text-zinc-600">Name</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'style' ? 'e.g. cloud-nine' : 'e.g. Coffee shop ad'} className="rounded-2xl" />
+            <label htmlFor="publish-name" className="mb-1 block text-[12.5px] font-medium text-zinc-600">
+              Name <span className="text-zinc-400">({title.length}/{MAX_TITLE})</span>
+            </label>
+            <Input
+              id="publish-name"
+              value={title}
+              maxLength={MAX_TITLE}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={kind === 'style' ? 'e.g. cloud-nine' : 'e.g. Coffee shop ad'}
+              className="rounded-2xl"
+              autoFocus
+            />
           </div>
           <div>
-            <label className="mb-1 block text-[12.5px] font-medium text-zinc-600">Price in USD (0 = free)</label>
-            <Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} className="rounded-2xl" />
+            <label htmlFor="publish-author" className="mb-1 block text-[12.5px] font-medium text-zinc-600">
+              Your creator name <span className="text-zinc-400">({author.length}/{MAX_AUTHOR})</span>
+            </label>
+            <Input
+              id="publish-author"
+              value={author}
+              maxLength={MAX_AUTHOR}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="e.g. nova"
+              className="rounded-2xl"
+            />
           </div>
           <div>
-            <label className="mb-1 block text-[12.5px] font-medium text-zinc-600">Description</label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What makes it special?" className="min-h-20 rounded-2xl" />
+            <label htmlFor="publish-price" className="mb-1 block text-[12.5px] font-medium text-zinc-600">
+              Price in USD (0 = free)
+            </label>
+            <Input
+              id="publish-price"
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
+              className="rounded-2xl"
+            />
+          </div>
+          <div>
+            <label htmlFor="publish-desc" className="mb-1 block text-[12.5px] font-medium text-zinc-600">
+              Description <span className="text-zinc-400">({description.length}/{MAX_DESCRIPTION})</span>
+            </label>
+            <Textarea
+              id="publish-desc"
+              value={description}
+              maxLength={MAX_DESCRIPTION}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What makes it special?"
+              className="min-h-20 rounded-2xl"
+            />
           </div>
           <p className="rounded-2xl bg-zinc-50 p-3 text-[11.5px] leading-relaxed text-zinc-500">
-            v1 checkout is simulated locally — no real payments yet. Your listing appears instantly for you to import or sell.
+            Publishing is free. Your code is checked by the server before the listing goes live, and buyers get a durable
+            entitlement in their library. Paid checkout is not wired to a payment processor yet — priced listings record
+            ownership without moving money.
           </p>
-          <Button onClick={publish} className="w-full rounded-full bg-violet-600 text-white hover:bg-violet-700">
-            Publish to Marketplace
+          <Button
+            onClick={() => void publish()}
+            disabled={busy}
+            className="w-full rounded-full bg-violet-600 text-white hover:bg-violet-700"
+          >
+            {busy ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Validating &amp; publishing…
+              </>
+            ) : (
+              'Publish to Marketplace'
+            )}
           </Button>
         </div>
       </DialogContent>

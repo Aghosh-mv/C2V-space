@@ -7,13 +7,14 @@ import { useState } from 'react';
 import { Copy, History, Trash2, CornerDownLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { deleteSession, type CodeSession } from '@/lib/scenelang/history';
+import { type CodeSession } from '@/lib/scenelang/history';
 import { MiniThumb } from './mini-thumb';
 
 interface Props {
   sessions: CodeSession[];
   version: number;
   onLoad: (code: string, kind: 'scene' | 'style') => void;
+  onDelete: (id: string) => void;
 }
 
 function timeAgo(ts: number): string {
@@ -29,7 +30,7 @@ function firstLine(code: string): string {
   return (line ?? 'empty session').slice(0, 72);
 }
 
-export function HistoryView({ sessions, version, onLoad }: Props) {
+export function HistoryView({ sessions, version, onLoad, onDelete }: Props) {
   void version;
   const [filter, setFilter] = useState<'all' | 'scene' | 'style'>('all');
   const shown = sessions.filter((s) => filter === 'all' || s.kind === filter);
@@ -123,10 +124,7 @@ export function HistoryView({ sessions, version, onLoad }: Props) {
                   variant="ghost"
                   className="ml-auto h-8 w-8 rounded-full text-zinc-400 hover:text-rose-600"
                   aria-label={`Delete session ${session.id}`}
-                  onClick={() => {
-                    deleteSession(session.id);
-                    toast.success('Session deleted');
-                  }}
+                  onClick={() => onDelete(session.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
