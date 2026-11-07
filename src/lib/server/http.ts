@@ -17,7 +17,10 @@ export async function withDb<T>(fn: () => Promise<T>): Promise<
     return { ok: true, data: await fn() };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'database unavailable';
-    if (message.includes('DATABASE_URL') || /Can't reach database|ECONNREFUSED|PrismaClientInitializationError/.test(message)) {
+    if (
+      message.includes('DATABASE_URL') ||
+      /Can't reach database|ECONNREFUSED|PrismaClientInitializationError|Unable to open the database file|Error code 14/.test(message)
+    ) {
       console.error('[c2v-api] database unavailable:', message);
       return { ok: false, response: apiError(503, 'The database is unreachable — try again shortly.') };
     }
